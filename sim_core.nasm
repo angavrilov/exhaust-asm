@@ -300,9 +300,9 @@ bool_get_mask:
   %elif has_side_effects(%3) || flag_set(%4, NEED_OFS|NEED_VAL)
       xor             ARG_%1_OFS, ARG_%1_OFS
       get_dword       ARG_%1_OFS_32, xmm1, %2
-      lea             rdx, instr(ARG_%1_OFS)
 
     %if mode_base(%3) != MODE_DIRECT
+        lea             rdx, instr(ARG_%1_OFS)
         movdqa          xmm2, [rdx]
       %if mode_base(%3) == MODE_PREDEC
           xmm_dec_mask_wrap  xmm2, %3, CORE_SIZE_1_XMM
@@ -331,6 +331,7 @@ bool_get_mask:
           movdqa             [rdx], xmm2
       %endif
     %elif flag_set(%4, NEED_VAL)
+        lea             rdx, instr(ARG_%1_OFS)
         movdqa          ARG_%1_XMM, [rdx]
     %endif
   %endif
