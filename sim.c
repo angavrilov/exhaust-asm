@@ -54,13 +54,15 @@ typedef struct w_st {
 #define DEF_PROCESSES 8000
 #define DEF_CYCLES 80000
 
-static unsigned int Coresize  = 0;
-static unsigned int Processes = 0;
-static unsigned int NWarriors = 0;
-static unsigned int Cycles    = 0;
+static unsigned int Coresize   = 0;
+static unsigned int Queue_Size = 0;
+static unsigned int Processes  = 0;
+static unsigned int NWarriors  = 0;
+static unsigned int Cycles     = 0;
 
 static w_t           *War_Tab = NULL;
 static core_insn_t   *Core_Mem = NULL;
+static void          *Real_Core_Mem = NULL;
 static unsigned long *Queue_Mem = NULL;
 
 /* P-space */
@@ -124,7 +126,7 @@ void
 sim_free_bufs()
 {
   free_pspaces(NWarriors);
-  if ( Core_Mem ) free( Core_Mem ); Core_Mem = NULL; Coresize = 0;
+  if ( Core_Mem ) free( Real_Core_Mem ); Core_Mem = NULL; Coresize = 0;
   if ( Queue_Mem ) free( Queue_Mem ); Queue_Mem = NULL; Processes = 0;
   if ( War_Tab ) free( War_Tab ); War_Tab = NULL; NWarriors = 0;
 }
@@ -139,9 +141,15 @@ sim_alloc_bufs2( unsigned int nwars, unsigned int coresize,
 
   sim_free_bufs();
 
-  Core_Mem = (core_insn_t*)malloc( sizeof(core_insn_t) * coresize );
+  Real_Core_Mem = malloc( sizeof(core_insn_t) * (coresize+2) );
+  Core_Mem = (core_insn_t*)(((unsigned long)Real_Core_Mem) & ~15) + 1;
+
   queue_size = nwars*processes+1;
-  Queue_Mem = (unsigned long*)malloc( sizeof(unsigned long)*queue_size );
+  Queue_Size = 2;
+  while (Queue_Size < queue_size)
+    Queue_Size <<= 1;
+
+  Queue_Mem = (unsigned long*)malloc( sizeof(unsigned long)*Queue_Size );
   War_Tab = (w_t*)malloc( sizeof(w_t)*nwars );
   alloc_pspaces(nwars, pspace);
 
