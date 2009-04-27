@@ -196,10 +196,10 @@ BITS 64
 
 %macro add_wrap 3
     add %1, %2
+    mov rax, %1
+    sub rax, %3
     cmp %1, %3
-    jb %%no_wrap
-    sub %1, %3
-  %%no_wrap:
+    cmovae %1, rax
 %endmacro
 
 ; ***** SSE UTILS *****
