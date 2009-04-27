@@ -1,0 +1,10 @@
+time ./$1 -bkF 4000 -r 1000 fixed.rc fixed.rc
+time ./$1 -bkF 4000 -r 1000 jaguar.rc fixed.rc
+time ./$1 -bkF 4000 -r 1000 jaguar.rc jaguar.rc
+time ./$1 -bkF 4000 -r 1000 stalker.rc fixed.rc
+time ./$1 -bkF 4000 -r 1000 stalker.rc jaguar.rc
+time ./$1 -bkF 4000 -r 1000 stalker.rc stalker.rc
+time ./$1 -bkF 4000 -r 1000 npaper2.rc fixed.rc
+time ./$1 -bkF 4000 -r 1000 npaper2.rc jaguar.rc
+time ./$1 -bkF 4000 -r 1000 npaper2.rc stalker.rc
+time ./$1 -bkF 4000 -r 1000 npaper2.rc npaper2.rc
