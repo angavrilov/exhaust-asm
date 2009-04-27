@@ -193,6 +193,7 @@ import_warriors()
 
     for (i=0; i<NWarriors; i++) {
 	asm_fname( WarriorNames[i], &Warriors[i], OPT_coresize );
+	sim_compile_warrior( Warriors[i].compiled_code, Warriors[i].code, Warriors[i].len );
     }
 }
 
@@ -377,7 +378,7 @@ load_warriors()
 {
     unsigned int i;
     for (i=0; i<NWarriors; i++) {
-	sim_load_warrior(Positions[i], &Warriors[i].code[0], Warriors[i].len);
+	sim_load_warrior(Positions[i], &Warriors[i].compiled_code[0], Warriors[i].len);
     }
 }
 

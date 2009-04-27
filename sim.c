@@ -181,7 +181,7 @@ sim_alloc_bufs( unsigned int nwars, unsigned int coresize,
  *     sim_load_warrior -- load warrior code into core.
  * 
  * SYNOPSIS
- *     sim_load_warrior(unsigned int pos, insn_t *code, unsigned int len);
+ *     sim_load_warrior(unsigned int pos, core_insn_t *code, unsigned int len);
  * 
  * INPUTS
  *     pos -- The core address to load the warrior into.
@@ -208,23 +208,18 @@ sim_alloc_bufs( unsigned int nwars, unsigned int coresize,
 
 extern unsigned long _opcode_handler_table[18][7][8][8];
 
-int
-sim_load_warrior(unsigned int pos, const insn_t *code, unsigned int len)
+
+void
+sim_compile_warrior(core_insn_t *output, const insn_t *code, unsigned int len)
 {
   unsigned int i, mode_a, mode_b, modifier;
-  field_t k;
   u32_t in;
   char buffer[256];
   unsigned long table_base, rc;
 
-  if ( Core_Mem == NULL )  return -1;
-  if ( len > Coresize ) return -2;
-
   table_base = (unsigned long)_opcode_handler_table;
 
   for (i=0; i<len; i++) {
-    k = (pos+i) % Coresize;
-
 #if SIM_STRIP_FLAGS
     in = code[i].in & iMASK;
 #else
@@ -246,10 +241,31 @@ sim_load_warrior(unsigned int pos, const insn_t *code, unsigned int len)
       exit(1);
     }
 
-    Core_Mem[k].in = table_base + rc;
-    Core_Mem[k].a = code[i].a;
-    Core_Mem[k].b = code[i].b;
+    output[i].in = table_base + rc;
+    output[i].a = code[i].a;
+    output[i].b = code[i].b;
   }
+}
+
+int
+sim_load_warrior(unsigned int pos, const core_insn_t *code, unsigned int len)
+{
+  unsigned int sz1, sz2;
+
+  if ( Core_Mem == NULL )  return -1;
+  if ( len > Coresize ) return -2;
+
+  sz1 = Coresize - pos;
+  if (sz1 > len)
+    sz1 = len;
+
+  memcpy(Core_Mem + pos, code, sz1*sizeof(core_insn_t));
+
+  sz2 = len - sz1;
+
+  if (sz2 > 0)
+    memcpy(Core_Mem, code+sz1, sz2*sizeof(core_insn_t));
+
   return 0;
 }
 

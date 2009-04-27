@@ -50,19 +50,28 @@ typedef int            s32_t;
 #endif
 
   /*
-   * Instructions in core:
+   * Instructions after load:
    */
   typedef struct insn_st {
     u16_t in;                   /* flags, opcode, modifier, a- and b-modes */
     field_t a, b;               /* a-value, b-value */
   } insn_t;
 
+  
+  /*
+   * Instructions in core
+   */
+  typedef struct core_insn_st {
+    unsigned long in;            /* opaque identifier (handler address) */
+    unsigned a, b;               /* a-value, b-value */
+  } core_insn_t;
 
   /*
    * Warrior struct
    */
   typedef struct warrior_st {
     insn_t code[ MAXLENGTH ];   /* code of warrior */
+    core_insn_t compiled_code[ MAXLENGTH ];
     unsigned int len;		/* length of -"- */
     unsigned int start;		/* start relative to first insn */
 

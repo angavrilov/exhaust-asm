@@ -6,11 +6,6 @@
 
 #include "pspace.h"
 
-typedef struct core_insn_st {
-  unsigned long in;            /* flags, opcode, modifier, a- and b-modes */
-  unsigned a, b;               /* a-value, b-value */
-} core_insn_t;
-
 core_insn_t *sim_alloc_bufs( unsigned int nwar, unsigned int coresize,
 			unsigned int processes, unsigned int cycles );
 
@@ -31,7 +26,9 @@ void sim_clear_pspaces(void);
 
 void sim_reset_pspaces(void);
 
-int sim_load_warrior(unsigned int pos, insn_t const *code, unsigned int len);
+void sim_compile_warrior(core_insn_t *output, insn_t const *code, unsigned int len);
+
+int  sim_load_warrior(unsigned int pos, core_insn_t const *code, unsigned int len);
 
 
 
