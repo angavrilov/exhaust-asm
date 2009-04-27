@@ -533,7 +533,9 @@ gen_all_modes gen_jmp_cmd
 dat_cmd_common:
     ; Decrement the process counter
     sub warrior_live(CUR_WARRIOR), dword 1
-    jnz .continue
+    jz .continue
+    cmd_end
+ .continue:
     ; Destroy the dead warrior
     mov rdx, warrior_prev(CUR_WARRIOR)
     mov warrior_next(rdx), NEXT_WARRIOR
@@ -555,7 +557,6 @@ dat_cmd_common:
     mov ALIVE_CNT, ebx
     cmp ebx, 1
     jbe one_warrior_left
- .continue:
     cmd_end
 
 gen_all_modes gen_dat_cmd
