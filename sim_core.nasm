@@ -311,7 +311,11 @@ bool_get_mask:
       %if flag_set(%4, NEED_OFS|NEED_VAL)
           movdqa          xmm3, xmm2
           pslld           xmm3, 4
+        %if (mode_is_a(%3) && %2 == 3) || (!mode_is_a(%3) && %2 == 2)
+          xmm_add_wrap    xmm3, xmm4, CORE_SIZE_XMM
+        %else
           xmm_add_wrap    xmm3, xmm1, CORE_SIZE_XMM
+        %endif
           xor             ARG_%1_OFS, ARG_%1_OFS
         %if mode_is_a(%3)
             get_dword       ARG_%1_OFS_32, xmm3, 2
@@ -356,6 +360,10 @@ bool_get_mask:
       movdqa       xmm1, CUR_CMD_XMM
       pslld        xmm1, 4
       xmm_add_wrap xmm1, CUR_COFS_XMM, CORE_SIZE_XMM
+    %if (flag_set(%3, NEED_OFS|NEED_VAL) && %1 >= MODE_INDIRECT && !mode_is_a(%1)) || \
+        (flag_set(%4, NEED_OFS|NEED_VAL) && mode_is_a(%2))
+        pshufhw         xmm4, xmm1, shuffle(2,3,0,1)
+    %endif
  
       load_one_arg A,2,%1,%3
       load_one_arg B,3,%2,%4
@@ -423,7 +431,7 @@ _cmd_%1_%{$MOD}_%{$AMODE}_%{$BMODE}:
 ;  xmm6                      xmm14  CUR_CMD_XMM
 ;  xmm7  CORE_SIZE_1_XMM     xmm15  CORE_SIZE_XMM
 
-%define ALIVE_CNT [rbp-8*4-8]
+%define ALIVE_CNT  [rbp-8*5-8]
 %define PROC_LIMIT [rbp+16+8*0]
 %define DEATH_TAB  [rbp+16+8*1]
 
@@ -435,6 +443,7 @@ _do_simulate:
     push r13
     push r14
     push r15
+    push rbx
     sub  rsp, 8
     
     ; Shuffle parameters
@@ -478,13 +487,15 @@ _do_simulate:
     mov warrior_head(CUR_WARRIOR), rax
     
     ; Start the interpreter
-    jmp instr(CUR_COFS)
+    mov NEXT_CMD, instr(CUR_COFS)
+    jmp NEXT_CMD
 
     align 16
 timeout_reached:
 one_warrior_left:
     mov rax, ALIVE_CNT
     add rsp, 8
+    pop rbx
     pop r15
     pop r14
     pop r13
@@ -703,6 +714,10 @@ gen_all_modes gen_sub_cmd
 
 ;  ---- SNE ----
 
+    align 16
+full_mask:
+    dd 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF
+
 %macro gen_sne_cmd 0
     begin_cmd OP_SNE, NEED_VAL, NEED_VAL
 
@@ -710,6 +725,8 @@ gen_all_modes gen_sub_cmd
     pcmpeqd ARG_B_XMM, ARG_A_XMM  ; true => eq
   %if %$MOD != MOD_I    
     make_masks ARG_B_XMM, pandn   ; true => noneq in position
+  %else
+    pandn ARG_B_XMM, [full_mask]
   %endif
 
     test_xmm_lb ARG_B_XMM
@@ -730,6 +747,8 @@ gen_all_modes gen_sne_cmd
     pcmpeqd ARG_B_XMM, ARG_A_XMM  ; true => eq
   %if %$MOD != MOD_I    
     make_masks ARG_B_XMM, pandn   ; true => noneq in position
+  %else
+    pandn ARG_B_XMM, [full_mask]
   %endif
 
     test_xmm_lb ARG_B_XMM
