@@ -15,42 +15,42 @@ BITS 64
 %define mode_is_a(x)     (((x)&8) != 0)
 %define mode_ext_code(x) (mode_base(x) + (((x)&8)>>3)*3)
 
-%macro gen_all_bmodes 1
-    %assign %$BMODE MODE_DIRECT
+%macro gen_all_amodes 1
+    %assign %$AMODE MODE_DIRECT
     %1
-    %assign %$BMODE MODE_IMMEDIATE
+    %assign %$AMODE MODE_IMMEDIATE
     %1
-    %assign %$BMODE MODE_INDIRECT
+    %assign %$AMODE MODE_INDIRECT
     %1
-    %assign %$BMODE MODE_PREDEC
+    %assign %$AMODE MODE_PREDEC
     %1
-    %assign %$BMODE MODE_POSTINC
+    %assign %$AMODE MODE_POSTINC
     %1
-    %assign %$BMODE MODE_AINDIRECT
+    %assign %$AMODE MODE_AINDIRECT
     %1
-    %assign %$BMODE MODE_APREDEC
+    %assign %$AMODE MODE_APREDEC
     %1
-    %assign %$BMODE MODE_APOSTINC
+    %assign %$AMODE MODE_APOSTINC
     %1
 %endmacro
 
-%macro gen_all_amodes 1
-    %assign %$AMODE MODE_DIRECT
-    gen_all_bmodes %1
-    %assign %$AMODE MODE_IMMEDIATE
-    gen_all_bmodes %1
-    %assign %$AMODE MODE_INDIRECT
-    gen_all_bmodes %1
-    %assign %$AMODE MODE_PREDEC
-    gen_all_bmodes %1
-    %assign %$AMODE MODE_POSTINC
-    gen_all_bmodes %1
-    %assign %$AMODE MODE_AINDIRECT
-    gen_all_bmodes %1
-    %assign %$AMODE MODE_APREDEC
-    gen_all_bmodes %1
-    %assign %$AMODE MODE_APOSTINC
-    gen_all_bmodes %1
+%macro gen_all_bmodes 1
+    %assign %$BMODE MODE_DIRECT
+    gen_all_amodes %1
+    %assign %$BMODE MODE_IMMEDIATE
+    gen_all_amodes %1
+    %assign %$BMODE MODE_INDIRECT
+    gen_all_amodes %1
+    %assign %$BMODE MODE_PREDEC
+    gen_all_amodes %1
+    %assign %$BMODE MODE_POSTINC
+    gen_all_amodes %1
+    %assign %$BMODE MODE_AINDIRECT
+    gen_all_amodes %1
+    %assign %$BMODE MODE_APREDEC
+    gen_all_amodes %1
+    %assign %$BMODE MODE_APOSTINC
+    gen_all_amodes %1
 %endmacro
 
 ; ***** COMMAND MODIFIERS *****
@@ -66,19 +66,19 @@ BITS 64
 %macro gen_all_modes 1
     %push modes
     %assign %$MOD MOD_F
-    gen_all_amodes %1
+    gen_all_bmodes %1
     %assign %$MOD MOD_A
-    gen_all_amodes %1
+    gen_all_bmodes %1
     %assign %$MOD MOD_B
-    gen_all_amodes %1
+    gen_all_bmodes %1
     %assign %$MOD MOD_AB
-    gen_all_amodes %1
+    gen_all_bmodes %1
     %assign %$MOD MOD_BA
-    gen_all_amodes %1
+    gen_all_bmodes %1
     %assign %$MOD MOD_X
-    gen_all_amodes %1
+    gen_all_bmodes %1
     %assign %$MOD MOD_I
-    gen_all_amodes %1
+    gen_all_bmodes %1
     %pop
 %endmacro
 
@@ -113,6 +113,7 @@ BITS 64
 %define OP_STP 17
 
 %define full_opcode(o,m,ma,mb) (mode_ext_code(ma) | (mode_ext_code(mb)<<3) | ((m)<<6) | ((o)<<9))
+%define opcode_index(o,m,ma,mb) (mode_ext_code(ma) + 8*mode_ext_code(mb) + 64*(m) + 448*(o))
 
 ; ***** REGISTER ALLOCATION *****
 ;
@@ -403,7 +404,7 @@ bool_get_mask:
 %macro begin_cmd 3
     align 16
     dd full_opcode(%1,%$MOD,%$AMODE,%$BMODE)
-    dd 0
+    dd opcode_index(%1,%$MOD,%$AMODE,%$BMODE)
     dd 0
     dd 0
 _cmd_%1_%{$MOD}_%{$AMODE}_%{$BMODE}:

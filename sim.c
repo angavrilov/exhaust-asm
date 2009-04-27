@@ -233,7 +233,7 @@ sim_compile_warrior(core_insn_t *output, const insn_t *code, unsigned int len)
     modifier = in & moMASK;
     in >>= moBITS;
 
-    rc = _opcode_handler_table[in & opMASK][modifier][mode_a][mode_b];
+    rc = _opcode_handler_table[in & opMASK][modifier][mode_b][mode_a];
 
     if (rc == 0) {
       dis1(buffer, code[i], Coresize);
