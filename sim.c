@@ -41,8 +41,8 @@
 
 /* internal warrior structure */
 typedef struct w_st {
-  unsigned long *tail;		/* next free location to queue a process */
-  unsigned long *head;		/* next process to run from queue */
+  unsigned long head;		/* next process to run from queue */
+  unsigned long tail;		/* next free location to queue a process */
   struct w_st *succ;		/* next warrior alive */
   unsigned long nprocs;		/* number of live processes in this warrior */
   struct w_st *pred;		/* previous warrior alive */
@@ -78,10 +78,12 @@ static void free_pspaces( unsigned int nwars );
  * Simulator memory management
  */
 
+void _do_clear_core(core_insn_t *core, unsigned size);
+
 void
 sim_clear_core()
 {
-  memset(Core_Mem, 0, Coresize*sizeof(core_insn_t));
+  _do_clear_core(Core_Mem, Coresize);
 }
 
 
@@ -203,15 +205,22 @@ sim_alloc_bufs( unsigned int nwars, unsigned int coresize,
  *    -1 -- core memory not allocated.
  *    -2 -- warrior length > core size.
  */
+
+extern unsigned long _opcode_handler_table[18][7][8][8];
+
 int
 sim_load_warrior(unsigned int pos, const insn_t *code, unsigned int len)
 {
-  unsigned int i;
+  unsigned int i, mode_a, mode_b, modifier;
   field_t k;
   u32_t in;
+  char buffer[256];
+  unsigned long table_base, rc;
 
   if ( Core_Mem == NULL )  return -1;
   if ( len > Coresize ) return -2;
+
+  table_base = (unsigned long)_opcode_handler_table;
 
   for (i=0; i<len; i++) {
     k = (pos+i) % Coresize;
@@ -222,7 +231,22 @@ sim_load_warrior(unsigned int pos, const insn_t *code, unsigned int len)
     in = code[i].in;
 #endif
 
-    Core_Mem[k].in = in;
+    mode_a = in & mMASK;
+    in >>= mBITS;
+    mode_b = in & mMASK;
+    in >>= mBITS;
+    modifier = in & moMASK;
+    in >>= moBITS;
+
+    rc = _opcode_handler_table[in & opMASK][modifier][mode_a][mode_b];
+
+    if (rc == 0) {
+      dis1(buffer, code[i], Coresize);
+      printf("Opcode not supported: %s\n", buffer);
+      exit(1);
+    }
+
+    Core_Mem[k].in = table_base + rc;
     Core_Mem[k].a = code[i].a;
     Core_Mem[k].b = code[i].b;
   }
@@ -526,6 +550,9 @@ sim( int nwar,
 	( (paddr) ? pspaces_[(warid)]->mem[(paddr)]\
 		  : pspaces_[(warid)]->lastresult )
 
+int _do_simulate(core_insn_t *core, long core_size, unsigned long *qptr, unsigned long queue_mask,
+                 w_t *cur_warrior, unsigned long cycles, unsigned long proc_limit, unsigned *death_tab);
+
 
 int
 sim_proper( unsigned int nwar, const field_t *war_pos_tab,
@@ -641,9 +668,9 @@ sim_proper( unsigned int nwar, const field_t *war_pos_tab,
     if ( t > 0 ) War_Tab[t].succ = &War_Tab[t-1];
     if ( t < nwar-1 ) War_Tab[t].pred = &War_Tab[t+1];
     pqofs -= Processes;
-    *pqofs = war_pos_tab[ftmp];
-    War_Tab[t].head = pqofs;
-    War_Tab[t].tail = pqofs+1;
+    *pqofs = war_pos_tab[ftmp]*sizeof(core_insn_t);
+    War_Tab[t].head = (pqofs-queue_start);
+    War_Tab[t].tail = (pqofs-queue_start)+1;
     War_Tab[t].nprocs = 1;
     War_Tab[t].id = ftmp;
     --t;
@@ -655,6 +682,10 @@ sim_proper( unsigned int nwar, const field_t *war_pos_tab,
    * Main loop is run for each executed instruction
    */
   w = &War_Tab[ nwar-1 ];
+
+  return _do_simulate(core, coresize*sizeof(core_insn_t), queue_start, Queue_Size-1, w, cycles, Processes, death_tab);
+
+#if 0
   do {
 
     ip = *w->head++;		/* load current instruction */
@@ -1204,4 +1235,5 @@ sim_proper( unsigned int nwar, const field_t *war_pos_tab,
   printf("cycles: %d\n", cycles);
 #endif
   return alive_cnt;
+#endif
 }
