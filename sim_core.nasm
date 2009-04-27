@@ -510,7 +510,7 @@ one_warrior_left:
     cmd_end_next
 %endmacro
 
-gen_one_mod gen_nop_cmd, MOD_F, 1
+gen_all_modes gen_nop_cmd
 
 ;  ---- JMP ----
 
@@ -520,7 +520,7 @@ gen_one_mod gen_nop_cmd, MOD_F, 1
     cmd_end
 %endmacro
 
-gen_one_mod gen_jmp_cmd, MOD_F, 1
+gen_all_modes gen_jmp_cmd
 
 ;  ---- DAT ----
 
@@ -557,7 +557,7 @@ dat_cmd_common:
  .continue:
     cmd_end
 
-gen_one_mod gen_dat_cmd, MOD_F, 1
+gen_all_modes gen_dat_cmd
 
 ;  ---- SPL ----
 
@@ -578,7 +578,7 @@ spl_cmd_common:
  .continue:
     cmd_end
 
-gen_one_mod gen_spl_cmd, MOD_F, 1
+gen_all_modes gen_spl_cmd
 
 ;  ---- MOV ----
 
@@ -819,9 +819,9 @@ _do_clear_core:
     global _opcode_handler_table
 _opcode_handler_table:
     %assign OPCODE OP_DAT
-    gen_one_mod gen_opcode_ref, MOD_F, 7
+    gen_all_modes gen_opcode_ref
     %assign OPCODE OP_SPL
-    gen_one_mod gen_opcode_ref, MOD_F, 7
+    gen_all_modes gen_opcode_ref
     %assign OPCODE OP_MOV
     gen_all_modes gen_opcode_ref
     %assign OPCODE OP_DJN
@@ -841,9 +841,9 @@ _opcode_handler_table:
     %assign OPCODE OP_JMN
     gen_all_modes gen_opcode_ref
     %assign OPCODE OP_JMP
-    gen_one_mod gen_opcode_ref, MOD_F, 7
+    gen_all_modes gen_opcode_ref
     %assign OPCODE OP_NOP
-    gen_one_mod gen_opcode_ref, MOD_F, 7
+    gen_all_modes gen_opcode_ref
     %assign OPCODE OP_MUL
     gen_all_modes gen_opcode_stub
     %assign OPCODE OP_MODM
