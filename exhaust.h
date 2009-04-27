@@ -33,13 +33,13 @@
 /* misc. integral types */
 typedef unsigned char  u8_t;
 typedef unsigned short u16_t;
-typedef unsigned long  u32_t;
-typedef long           s32_t;
+typedef unsigned int   u32_t;
+typedef int            s32_t;
 
   /* Choose an appropriate field_t width.  In a field_t variable
    * we hold unsigned integers in 0..CORESIZE-1
    */
-#define FIELD_T_WIDTH 16
+#define FIELD_T_WIDTH 32
 
 #if FIELD_T_WIDTH <= 8
   typedef u8_t field_t;

@@ -8,7 +8,7 @@ OPT = -O4
 # Recommended extra options for gcc:
 #OPT += -fomit-frame-pointer -fforce-addr -finline-functions -funroll-loops
 #OPT += -mcpu=i686 -march=i686
-#DBG += -W -Wall -pedantic -ansi
+DBG += -W -Wall -pedantic -ansi
 
 LD = 
 EXECUTABLES = exhaust

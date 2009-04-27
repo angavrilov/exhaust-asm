@@ -41,12 +41,12 @@
 
 /* internal warrior structure */
 typedef struct w_st {
-  field_t *tail;		/* next free location to queue a process */
-  field_t *head;		/* next process to run from queue */
+  unsigned long *tail;		/* next free location to queue a process */
+  unsigned long *head;		/* next process to run from queue */
   struct w_st *succ;		/* next warrior alive */
-  u32_t nprocs;			/* number of live processes in this warrior */
+  unsigned long nprocs;		/* number of live processes in this warrior */
   struct w_st *pred;		/* previous warrior alive */
-  int id;			/* index (or identity) of warrior */
+  long id;			/* index (or identity) of warrior */
 } w_t;
 
 #define DEF_MAX_WARS 2
@@ -59,9 +59,9 @@ static unsigned int Processes = 0;
 static unsigned int NWarriors = 0;
 static unsigned int Cycles    = 0;
 
-static w_t          *War_Tab = NULL;
-static insn_t       *Core_Mem = NULL;
-static field_t      *Queue_Mem = NULL;
+static w_t           *War_Tab = NULL;
+static core_insn_t   *Core_Mem = NULL;
+static unsigned long *Queue_Mem = NULL;
 
 /* P-space */
 static unsigned int PSpace_size = 0;    /* # p-space slots per warrior. */
@@ -79,7 +79,7 @@ static void free_pspaces( unsigned int nwars );
 void
 sim_clear_core()
 {
-  memset(Core_Mem, 0, Coresize*sizeof(insn_t));
+  memset(Core_Mem, 0, Coresize*sizeof(core_insn_t));
 }
 
 
@@ -88,11 +88,11 @@ sim_clear_core()
  *				alloc and free buffers used in simulation
  * 
  * SYNOPSIS
- *     insn_t *sim_alloc_bufs( unsigned int nwars, unsigned int coresize,
- *                             unsigned int processes, unsigned int cycles );
- *     insn_t *sim_alloc_bufs2( unsigned int nwars, unsigned int coresize,
- *				unsigned int processes, unsigned int cycles,
- *				unsigned int pspacesize );
+ *     core_insn_t *sim_alloc_bufs( unsigned int nwars, unsigned int coresize,
+ *                                  unsigned int processes, unsigned int cycles );
+ *     core_insn_t *sim_alloc_bufs2( unsigned int nwars, unsigned int coresize,
+ *				     unsigned int processes, unsigned int cycles,
+ *				     unsigned int pspacesize );
  *     void sim_free_bufs();
  * 
  * INPUTS
@@ -130,7 +130,7 @@ sim_free_bufs()
 }
 
 
-insn_t *
+core_insn_t *
 sim_alloc_bufs2( unsigned int nwars, unsigned int coresize,
 		 unsigned int processes, unsigned int cycles,
 		 unsigned int pspace )
@@ -139,9 +139,9 @@ sim_alloc_bufs2( unsigned int nwars, unsigned int coresize,
 
   sim_free_bufs();
 
-  Core_Mem = (insn_t*)malloc( sizeof(insn_t) * coresize );
+  Core_Mem = (core_insn_t*)malloc( sizeof(core_insn_t) * coresize );
   queue_size = nwars*processes+1;
-  Queue_Mem = (field_t*)malloc( sizeof(field_t)*queue_size );
+  Queue_Mem = (unsigned long*)malloc( sizeof(unsigned long)*queue_size );
   War_Tab = (w_t*)malloc( sizeof(w_t)*nwars );
   alloc_pspaces(nwars, pspace);
 
@@ -157,7 +157,7 @@ sim_alloc_bufs2( unsigned int nwars, unsigned int coresize,
   return NULL;
 }
 
-insn_t *
+core_insn_t *
 sim_alloc_bufs( unsigned int nwars, unsigned int coresize,
 		unsigned int processes, unsigned int cycles )
 {
@@ -222,8 +222,6 @@ sim_load_warrior(unsigned int pos, const insn_t *code, unsigned int len)
 }
 
 
-
-
 /*---------------------------------------------------------------
  * P-Space management.
  */
@@ -551,8 +549,8 @@ sim_proper( unsigned int nwar, const field_t *war_pos_tab,
    * 0          P         2P 2P+1
    */
 
-  insn_t *core;
-  field_t *queue_start, *queue_end; /* queue mem. start, end */
+  core_insn_t *core;
+  unsigned long *queue_start, *queue_end; /* queue mem. start, end */
 
   /*
    * Cache Registers.
@@ -589,8 +587,9 @@ sim_proper( unsigned int nwar, const field_t *war_pos_tab,
 #define in_a ra_a
 #define in_b rb_b
 
-  field_t *pofs;
-  insn_t *pt;
+  unsigned *pofs;
+  unsigned long *pqofs;
+  core_insn_t *pt;
   unsigned int mode;
 
   /*
@@ -606,7 +605,7 @@ sim_proper( unsigned int nwar, const field_t *war_pos_tab,
   u32_t pspacesize;
 
 #if DEBUG >= 1
-  insn_t insn;			/* used for disassembly */
+  core_insn_t insn;		/* used for disassembly */
   char debug_line[256];		/* ditto */
 #endif
 
@@ -625,7 +624,7 @@ sim_proper( unsigned int nwar, const field_t *war_pos_tab,
   pspacesize = PSpace_size;
 
   /* Setup War_Tab and links all around */
-  pofs = queue_end-1;		/* init. wars[] table */
+  pqofs = queue_end-1;		/* init. wars[] table */
   War_Tab[0].succ = &War_Tab[nwar-1];
   War_Tab[nwar-1].pred = &War_Tab[0];
   t = nwar-1;
@@ -633,10 +632,10 @@ sim_proper( unsigned int nwar, const field_t *war_pos_tab,
   do {
     if ( t > 0 ) War_Tab[t].succ = &War_Tab[t-1];
     if ( t < nwar-1 ) War_Tab[t].pred = &War_Tab[t+1];
-    pofs -= Processes;
-    *pofs = war_pos_tab[ftmp];
-    War_Tab[t].head = pofs;
-    War_Tab[t].tail = pofs+1;
+    pqofs -= Processes;
+    *pqofs = war_pos_tab[ftmp];
+    War_Tab[t].head = pqofs;
+    War_Tab[t].tail = pqofs+1;
     War_Tab[t].nprocs = 1;
     War_Tab[t].id = ftmp;
     --t;

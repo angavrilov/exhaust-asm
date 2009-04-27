@@ -6,10 +6,15 @@
 
 #include "pspace.h"
 
-insn_t *sim_alloc_bufs( unsigned int nwar, unsigned int coresize,
+typedef struct core_insn_st {
+  unsigned long in;            /* flags, opcode, modifier, a- and b-modes */
+  unsigned a, b;               /* a-value, b-value */
+} core_insn_t;
+
+core_insn_t *sim_alloc_bufs( unsigned int nwar, unsigned int coresize,
 			unsigned int processes, unsigned int cycles );
 
-insn_t *sim_alloc_bufs2( unsigned int nwar, unsigned int coresize,
+core_insn_t *sim_alloc_bufs2( unsigned int nwar, unsigned int coresize,
 			 unsigned int processes, unsigned int cycles,
 			 unsigned int pspace );
 

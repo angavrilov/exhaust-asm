@@ -436,14 +436,14 @@ output_results()
     unsigned int j;
 
     if (NWarriors == 2 && !OPT_m) {
-	printf("%ld %ld\n", Results[0][1], Results[0][2]);
-	printf("%ld %ld\n", Results[1][1], Results[1][2]);
+	printf("%ld %ld\n", (long)Results[0][1], (long)Results[0][2]);
+	printf("%ld %ld\n", (long)Results[1][1], (long)Results[1][2]);
     } else {
 	for (i=0; i<NWarriors; i++) {
 	    for (j=1; j<=NWarriors; j++) {
-		printf("%ld ", Results[i][j]);
+		printf("%ld ", (long)Results[i][j]);
 	    }
-	    printf("%ld\n", Results[i][0]);
+	    printf("%ld\n", (long)Results[i][0]);
 	}
     }
 }
