@@ -276,8 +276,8 @@ bool_get_mask:
     dd 0xFFFFFFFF
 
 %macro test_xmm_lb 1
-    pshufb ARG_B_XMM, [bool_get_mask]
-    movd eax, ARG_B_XMM
+    pshufb %1, [bool_get_mask]
+    movd eax, %1
     test eax, eax
 %endmacro
 
