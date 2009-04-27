@@ -781,6 +781,49 @@ gen_all_modes gen_seq_cmd
 
 gen_all_modes gen_jmn_cmd
 
+;  ---- MUL ----
+
+%macro gen_mul_cmd 0
+    begin_cmd OP_MUL, NEED_VAL, (NEED_OFS|NEED_VAL)
+    make_masks xmm1
+    make_shuffle ARG_A_XMM
+    get_real_b_val xmm2
+
+    mov rsi, CORE_SIZE  ; ARG_A_OFS unused
+    shr rsi, 4
+   
+  %if (%$MOD != MOD_B) && (%$MOD != MOD_AB)
+    get_dword eax, ARG_A_XMM, 2
+    get_dword edx, ARG_B_XMM, 2
+    mul edx
+    div rsi
+    movd xmm3, edx
+    pshufd xmm3, xmm3, shuffle(1,1,0,1)
+  %endif
+
+  %if (%$MOD != MOD_A) && (%$MOD != MOD_BA)
+    get_dword eax, ARG_A_XMM, 3
+    get_dword edx, ARG_B_XMM, 3
+    mul edx
+    div rsi
+    movd xmm4, edx
+    pshufd xmm4, xmm4, shuffle(1,1,1,0)
+  %endif
+
+  %if (%$MOD == MOD_A) || (%$MOD == MOD_BA)
+    save_fields xmm1, xmm3, xmm2
+  %else
+    %if (%$MOD != MOD_B) && (%$MOD != MOD_AB)
+      por xmm4, xmm3
+    %endif
+    save_fields xmm1, xmm4, xmm2
+  %endif
+
+    cmd_end_next
+%endmacro
+
+gen_all_modes gen_mul_cmd
+
 ; ***** CORE CLEAR *****
 
     global _do_clear_core
@@ -847,7 +890,7 @@ _opcode_handler_table:
     %assign OPCODE OP_NOP
     gen_all_modes gen_opcode_ref
     %assign OPCODE OP_MUL
-    gen_all_modes gen_opcode_stub
+    gen_all_modes gen_opcode_ref
     %assign OPCODE OP_MODM
     gen_all_modes gen_opcode_stub
     %assign OPCODE OP_DIV
