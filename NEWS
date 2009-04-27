@@ -1,0 +1,45 @@
+* Version 1.9.2:
+
+- Lifted hardcoded upper limit on the number of warriors.
+
+* Version 1.9:
+
+- Flags in instructions aren't masked when decoding instructions
+  during simulation anymore.  You should either clear the flags fields
+  before loading, or use the new function sim_load_warrior() to load
+  your warriors.  If that's not feasible, define the preprocessor
+  variable SIM_STRIP_FLAGS to be 0 when compiling.
+
+  As far as I can tell nobody was using the flags field anyway.  Sorry
+  if this breaks anyones code.
+
+- P-space!  See the README for details.
+
+- You need to link the file pspace.o whenever you are linking sim.o
+  regardless of whether p-space is in use or not.
+
+- To accomodate p-space the encoding of instructions has changed.  One
+  flag bit has evaporated to make room for LDP/STP, and the order of
+  enumeration of opcodes differs from version 1.7.  If you've been
+  using the macros in insn.h or the assembler, then there's nothing to
+  worry about.  Sorry if this breaks anyones code.
+
+- Now placed into the Public Domain.
+
+- asm.h/asm_line() can now return -3 == ASMLINE_PIN to identify the
+  PIN pseudo-op.
+
+- The warrior_st struct in exhaust.h has new fields `have_pin' and `pin'.
+
+- Other changes to fix some compiler warnings/sign oddities.  Some
+  arguments of public prototypes have changed in signedness.
+
+- No more ABORT_TIES_EARLY, but that's OK as 1.8 was never released.
+
+- The example program exhaust.c now supports multiwarrior battles and
+  p-space.  Slightly cleaned up as well.
+
+* Version 1.8:
+
+- New compile-time option ABORT_TIES_EARLY to detect unwinnable
+  configurations where there are no deadly instructions in core.

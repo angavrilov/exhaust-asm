@@ -1,0 +1,339 @@
+$Id: README,v 1.11 2002/10/01 22:32:27 rowan Exp $
+
+This is exhaust version 1.9, a memory array redcode simulator.  It is
+mostly in the public domain (see the file COPYING for details).
+
+Files:
+        changelog          Log of Change.
+        COPYING            lack of license.
+        Makefile           file for make.
+        README             This file.
+	NEWS		   Notes about things that might break.
+        asm.c              (Dis)Assembler.
+        asm.h              Token codes and prototypes for assembler.
+        exhaust.c          Simplified pMARS-like simulator.
+        exhaust.h          Global constants, structures and types.
+        insn.h             Instruction encoding specs.
+        sim.c              Simulator proper.
+        sim.h              Simulator prototypes.
+	pspace.c	   P-space implementation.
+	pspace.h	   P-space prototypes.
+        test.pl            Perl program to test for differences between
+                           simulators.
+        t/*.red		   Redcode for tests.
+	t/*.rc		   Load files for tests.
+
+To compile on UNIX or on DOS with djgpp first edit the makefile to
+your comfort and then run `make' to get an executable `exhaust'.  If
+you have gcc you hopefully don't need to make any large makefile
+modifications.  See the section `How to use the simulator and friends'
+below for an overview of how to use the simulator in your programs.
+
+Thanks to the pMARS authors and Ken Espiritu for ideas implemented in
+this simulator.  Especially Ken's effective addressing calculation code
+from pMARS 0.8.6 was adapted for a great speed-up.
+
+
+* How to use the simulator and friends
+--------------------------------------
+
+This is a quick run-down on how to use the simulator and assembler
+with your program.  Special considerations for P-Space are detailed in
+the section about p-space below, so here non-P warriors are assumed.
+After munging your source file, remember to link your executable with
+sim.o, pspace.o, and asm.o!  You don't need asm.o if you don't use the
+assembler or disassembler.
+
+The main things that you should do are:
+  - generate (perhaps by assembling) the warrior code
+  - allocate the internal buffers
+  - clear core and load the warriors into it
+  - call the simulator to do it's thing
+
+In the examples, I assume you use a warrior structure similar to
+exhaust.h's struct warrior_st, but it is not canonical in any way.
+Here I rely on the following fields:
+
+        insn_t code[ MAXLENGTH ];   /* code of warrior */
+        int len;                    /* length of warrior code */
+        int start;                  /* start relative to first insn */
+
+* The assembler: 
+
+i) You need some declarations and includes:
+
+#include "exhaust.h"
+#include "asm.h"
+
+        warrior_t w1, w2;       /* warrior structs hold code and misc. info */
+        int CORESIZE = 8000,    /* size of core */
+            PROCESSES = 8000,   /* max. number of processes per warrior */
+            NWARRIORS = 2,      /* number of warriors */
+            CYCLES = 80000;     /* cycles until tie */
+
+ii) Then you want to assemble your warriors, say aeka and Rave:
+
+        asm_fname( "aeka.rc", &w1, CORESIZE );
+        asm_fname( "rave.rc", &w2, CORESIZE );
+
+You could also use asm_file(FILE *, warrior_t *, CORESIZE) to assemble
+from a stream.
+
+
+* Simulator:
+
+i) The simulator interface is simple.  First you need to allocate and
+query the address of the core memory:
+
+#include "exhaust.h"
+#include "sim.h"
+        insn_t *core;
+
+        core = sim_alloc_bufs( NWARRIORS, CORESIZE, PROCESSES, CYCLES );
+
+If any of the allocations failed the returned value will be NULL.  You
+should check for that. When you're done with the core memory and other
+buffers, call sim_free_bufs(void), but note that sim_alloc_bufs()
+frees any memory it previously allocated.  i.e. you can successively
+call it without intervening calls to sim_free_bufs().
+
+For backward compatibility you can also use use sim() as follows to
+allocate with the default CORESIZE=PROCESSES=8000:
+
+        (void) sim( -1, 0, 0, CYCLES, &core );
+
+ii) Then you clear core and load the warriors:
+
+        memset( core, 0, sizeof(insn_t) * CORESIZE );
+or
+	sim_clear_core();
+
+and
+	sim_load_warrior(0,   &(w1.code[0]), w1.len );
+	sim_load_warrior(pos, &(w2.code[0]), w2.len );
+
+where `pos' is the core address where you want to load w2.  This
+differs slightly from the previous release where you had to:
+
+        memcpy( core,       w1.code, sizeof(insn_t) * w1.len );
+        memcpy( core + pos, w2.code, sizeof(insn_t) * w2.len );
+
+You can still do that.  (Note however, that the flags field of
+instructions should be cleared as the simulator won't do it anymore.
+sim_load_warrior() does this for you.  You can get the old behaviour
+by defining the preprocessor variable SIM_STRIP_FLAGS to 1 at compile
+time.)
+
+
+iii) Right, now you're ready to fight.  If you have only one or two
+warriors, you can use sim():
+
+        result = sim( 2, w1.start, (w2.start+pos)%CORESIZE, CYCLES, NULL);
+
+The result is 0 if w1 won, 1 if w2 won, and 2 on a tie (-1 if the
+simulator panics).
+
+For multi-warrior battles with more than two warriors you need
+some extra declarations:
+
+        field_t war_pos_tab[ NWAR ];    /* a table of core addresses
+                                         * that specify where the warriors
+                                         * start their execution. */
+        int death_tab[ NWAR ];          /* the simulator stores the
+                                         * results here. (see below) */
+
+Then allocate the buffers and obtain the core address using
+sim_alloc_bufs(), clear the core, and load the warriors into it as
+before.  Save the positions where you loaded the warriors into
+war_pos_tab[].  Now you're ready to fight, so call sim_mw():
+
+        int alive_cnt;
+        alive_cnt = sim_mw( NWAR, war_pos_tab, death_tab );
+
+The return value is the number of warriors alive at the end of the
+round.  Dead warriors are recorded into death_tab[] by order of death.
+i.e. death_tab[0] contains the index of the first warrior to die,
+death_tab[1] the index of the second to go, and so on.
+
+
+* The disassembler:
+
+If you want to disassemble an instruction use dis1() or discore() from
+asm.c.  Examples:
+
+#include "exhaust.h"
+#include "asm.h"
+
+        char str[60];
+        insn_t instr;
+
+        instr.in = _OP( SPL, mF, DIRECT, BPREDEC );
+        instr.a = instr.b = 0;
+        core[1234] = instr;
+
+        dis1( str, core[1234], CORESIZE ); printf("%s\n", str);
+        dis1( str, instr, CORESIZE );      printf("%s\n", str);
+
+                                        /* disassemble addresses 5..14 */
+        discore( core, 5, 15, CORESIZE);/* and print to stdout. */
+
+
+* P-Space
+---------
+
+The simulator interface is oriented toward playing single battles, but
+p-space by its nature requires a multi-round interface.  Hence there
+are some complications when playing p-space warriors.  The main change
+for P-spacer battles over normal ones is that you need to pair
+p-spaces to warriors.  Also, if you are running multiple battles you
+need to reinitialise the p-spaces between each battle.
+
+The basic model is simple: the simulator maintains an array of
+NWARRIORS p-spaces that you may manipulate.  The ith p-space in this
+array always corresponds to the ith warrior passed to sim() or
+sim_mw(), so that the first warrior always accesses the first p-space,
+the second the second, and so on.  The pairing betweens p-spaces and
+warriors is up to you.  After each round the p-space location 0 of
+each warrior is updated with either a) zero if the warrior died or b)
+the number of warriors alive at the end of the battle.
+
+[A note about naming conventions: pspace_XXX() functions are mostly
+local in nature -- they refer only to their argument p-spaces.  The
+sim_XXX_pspace() functions are about the collection of p-spaces
+maintained by the simulator.]
+
+
+* Accessing p-spaces
+
+To get a pointer to the ith p-space you use the function
+sim_get_pspace():
+
+	pspace_t *p = sim_get_pspace(i);
+
+Then to access the cells of `p', use the functions pspace_get() and
+pspace_set():
+
+	contents_of_cell_123 = pspace_get(p, 123);
+
+	pspace_set(p, 123, new_contents);
+
+
+* P-space initialisation; resets
+
+ - The size of p-space is specified at memory allocation time using
+   the function sim_alloc_bufs2().  It is exactly like
+   sim_alloc_bufs(), except it takes as an additional parameter the
+   size of pspace, which must be positive.  The later function
+   defaults p-space to CORESIZE/16 cells, so you don't need to change
+   it.
+
+ - The function sim_clear_pspaces() clears the p-spaces of all warriors
+   and stores CORESIZE-1 into their p-space location 0.  P-Space is
+   cleared on allocation, so you only need to call this function
+   between battles, but not rounds.  This function doesn't change
+   the sharing status of p-spaces.
+
+ - To completely reinitialise p-spaces and to make p-spaces of each
+   warrior private again, call the sim_reset_pspaces() function.  This
+   also calls sim_clear_pspaces().
+
+
+* Pairing p-spaces to warriors
+
+If you are changing the order in which warriors execute within each
+cycle on a per-round basis, you need to order p-spaces as well.  For
+example, pMARS cyclically permutes the order of warriors so that every
+even round the first warrior executes first in each cycle, and every
+odd round the second warrior executes first.  With non-pspace warriors
+you only need to give the starting positions of the warriors in the
+`war_pos_tab[]' argument in the order you want the warriors to
+execute, but with p-warriors involved you need to match p-spaces to
+warriors as well.
+
+ - The simulator maintains an array of pointers to p-space structures,
+   one for each warrior.  The ith p-space structure corresponds to the
+   ith warrior in the `war_pos_tab[]' array argument of warrior
+   starting positions passed to sim_mw().  Similarly for the two
+   warriors given to the sim() function.  You need to order this array
+   of pointers to match the order in which you are passing warrior
+   starting positions to the simulator.
+
+   To access the array, use sim_get_pspaces():
+
+	pspace_t **pspaces;
+	pspaces = sim_get_pspaces();
+
+	// now permute the pointers in the pspaces array into the
+	// same order as your warriors.
+	...
+
+   Of course, if you are not changing the order in which warriors
+   execute on a per-round basis, you don't need to permute the pspaces
+   array.  This may be suitable in some cases.
+
+
+* Sharing p-spaces
+
+There is only minimal support for PINs and p-space sharing in that the
+assembler understands the `PIN' pseudo-op, but you must match PINs to
+p-spaces yourself.
+
+  - The warrior structure warrior_st in exhaust.h needs the extra fields
+  
+	int have_pin;			// boolean: is field `pin' valid?
+	u32_t pin;			// PIN of warrior, possibly.
+
+    that are used when assembling from files/streams.  The interface
+    to asm_line() has changed accordingly so it can identify and
+    return the PIN pseudo-op.
+
+  - To share p-spaces of two warriors, you need to call the function
+    pspace_share(p1, p2) for two pointers p1, p2 to p-spaces.  The
+    contents of p-space p1 becomes the contents of the shared p-space.
+    P-space location 0 is never shared.
+
+  - The function pspace_privatise(p) resets the p-space p to be
+    private.  The contents of p1 are then undefined.
+
+
+
+* Files that the assembler eats
+-------------------------------
+
+In short: the load files that the '94 draft specifies are accepted.
+Specifically, the files may contain only `;' comments, white space,
+instructions, and pseudo-ops.  The instructions must follow this form:
+
+  [opt START label]    OPCODE.MODIFIER  MODE integer , MODE integer
+
+Various idiosyncrasies:
+
+ - You can't implicitly specify direct addressing mode by dropping `$'.
+
+ - The start of a warrior is determined by the last seen appearance of
+   the START label or `ORG'.  Of the pseudo-ops using `END label' or
+   `ORG label' aren't supported; only `ORG integer' is.
+
+ - `END' stops warrior assembly.  You still can assemble from the
+   same file or stream another warrior that follows though.
+
+ - special KotH comments aren't recognised.
+
+To support using pMARS as an assembler any line that begins with
+`Program' is ignored.  So you could first say
+
+  pmars -r 0 Fancy_Source.red >Simple_Source.rc
+
+and then use the asm.c assembler to import Simple_Source.rc into your
+program.  Note that pmars doesn't output PINs of warriors.
+
+
+* When the simulator crashes
+----------------------------
+
+... or is just plain wrong by producing incorrect results please tell
+me about it at the address given below.  Ditto for the assembler or
+anything else in these files.  I'd appreciate a simple test case that
+illustrates the bug if possible.
+
+The author can be reached by email at: jpihlaja@cc.helsinki.fi

@@ -1,0 +1,20 @@
+Sat Dec 28 07:51:28 EET 2002  Joonas Pihlaja  <jpihlaja@cc.helsinki.fi>
+	* Removed limit on the maximum number of warriors in exhaust.c.
+
+Wed Oct  2 00:51:58 EEST 2002
+	* Now compiles with g++.
+
+Mon May 13 01:35:40 EEST 2002
+	* Removed ABORT_TIES_EARLY.  Ugly.
+	* Removed GPL.  Now Public Domain, except exhaust.c
+	  which contains the functions npos() and posit() from pMARS 0.9.2.
+	* Added P-space.
+	* (reminder) exhaust.c is a mess.  clean it up.
+	* Added multiwarrior battles to exhaust.c.
+
+Mon Jan  8 16:13:39 EET 2001  Joonas Pihlaja  <jpihlaja@cc.helsinki.fi>
+
+	* Added compile-time selectable option ABORT_TIES_EARLY that
+	  abort ties early when possible.  Tests indicate that only
+	  select warriors will benefit.  Mostly it deteriorates
+	  performance.
