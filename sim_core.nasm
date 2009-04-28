@@ -300,7 +300,6 @@ bool_get_mask:
 
 %macro load_one_arg_addr 4
   %if (mode_base(%3) != MODE_IMMEDIATE) && (has_side_effects(%3) || flag_set(%4, NEED_OFS|NEED_VAL))
-    xor             ARG_%1_OFS, ARG_%1_OFS
     get_dword       ARG_%1_OFS_32, xmm1, %2
   %endif
 %endmacro
@@ -329,7 +328,6 @@ bool_get_mask:
         %else
           xmm_add_wrap    xmm3, xmm1, CORE_SIZE_XMM
         %endif
-          xor             ARG_%1_OFS, ARG_%1_OFS
         %if mode_is_a(%3)
             get_dword       ARG_%1_OFS_32, xmm3, 2
         %else
