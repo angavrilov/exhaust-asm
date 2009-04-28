@@ -158,6 +158,7 @@ BITS 64
 
 %define NEXT_WARRIOR r9
 %define NEXT_COFS r10
+%define NEXT_COFS_32 r10d
 %define NEXT_CMD r11
 
 %define CORE_BASE r12
@@ -171,7 +172,7 @@ BITS 64
 
 ; ***** UTILS *****
 
-%define queue(idx) [QUEUE_BASE+(idx)*8]
+%define queue(idx) [QUEUE_BASE+(idx)*4]
 %define instr(ofs) [CORE_BASE+(ofs)]
 %define fld_a(ofs) [CORE_BASE+(ofs)+8]
 %define fld_b(ofs) [CORE_BASE+(ofs)+12]
@@ -390,7 +391,7 @@ bool_get_mask:
 %macro cmd_preamble 0
     lea rdx, warrior_head(NEXT_WARRIOR)
     mov rax, [rdx]
-    mov NEXT_COFS, queue(rax)
+    mov NEXT_COFS_32, queue(rax)
     step_queue rax
     mov NEXT_CMD, instr(NEXT_COFS)
     mov [rdx], rax
@@ -410,7 +411,7 @@ bool_get_mask:
     cmp CUR_COFS, CORE_SIZE
     jae %%fix_cwrap
   %%fixed_cwrap:
-    queue_cmd CUR_COFS
+    queue_cmd CUR_COFS_32
     cmd_end
   %%fix_cwrap:
     sub CUR_COFS, CORE_SIZE
@@ -500,7 +501,7 @@ _do_simulate:
     mov NEXT_WARRIOR, warrior_next(CUR_WARRIOR)
     
     mov rax, warrior_head(CUR_WARRIOR)
-    mov CUR_COFS, queue(rax)
+    mov CUR_COFS_32, queue(rax)
     step_queue rax
     mov warrior_head(CUR_WARRIOR), rax
     
@@ -534,7 +535,7 @@ gen_all_modes gen_nop_cmd
 
 %macro gen_jmp_cmd 0
     begin_cmd OP_JMP, NEED_OFS, 0
-    queue_cmd ARG_A_OFS
+    queue_cmd ARG_A_OFS_32
     cmd_end
 %endmacro
 
@@ -587,13 +588,13 @@ gen_all_modes gen_dat_cmd
 
 spl_cmd_common:
     add_wrap  CUR_COFS, 16, CORE_SIZE
-    queue_cmd CUR_COFS
+    queue_cmd CUR_COFS_32
     mov eax, warrior_live(CUR_WARRIOR)
     cmp eax, PROC_LIMIT
     jae .continue
     add eax, 1
     mov warrior_live(CUR_WARRIOR), eax
-    queue_cmd ARG_A_OFS
+    queue_cmd ARG_A_OFS_32
  .continue:
     cmd_end
 
@@ -693,7 +694,7 @@ gen_all_modes gen_mov_cmd
     
     test_xmm_lb ARG_B_XMM
     jz %%nojump
-    queue_cmd ARG_A_OFS         ; jump if nonzero
+    queue_cmd ARG_A_OFS_32      ; jump if nonzero
     cmd_end
   %%nojump:
     cmd_end_next
@@ -728,7 +729,7 @@ gen_all_modes gen_add_cmd
     jz %%jump
     cmd_end_next
   %%jump:
-    queue_cmd ARG_A_OFS     ; jump if zero
+    queue_cmd ARG_A_OFS_32  ; jump if zero
     cmd_end
 %endmacro
 
@@ -807,7 +808,7 @@ gen_all_modes gen_seq_cmd
 
     test_xmm_lb xmm0
     jz %%nojump
-    queue_cmd ARG_A_OFS     ; jump if nonzero
+    queue_cmd ARG_A_OFS_32  ; jump if nonzero
     cmd_end
   %%nojump:
     cmd_end_next

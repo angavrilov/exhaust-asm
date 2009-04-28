@@ -63,7 +63,7 @@ static unsigned int Cycles     = 0;
 static w_t           *War_Tab = NULL;
 static core_insn_t   *Core_Mem = NULL;
 static void          *Real_Core_Mem = NULL;
-static unsigned long *Queue_Mem = NULL;
+static unsigned      *Queue_Mem = NULL;
 
 /* P-space */
 static unsigned int PSpace_size = 0;    /* # p-space slots per warrior. */
@@ -151,7 +151,7 @@ sim_alloc_bufs2( unsigned int nwars, unsigned int coresize,
   while (Queue_Size < queue_size)
     Queue_Size <<= 1;
 
-  Queue_Mem = (unsigned long*)malloc( sizeof(unsigned long)*Queue_Size );
+  Queue_Mem = (unsigned long*)malloc( sizeof(unsigned)*Queue_Size );
   War_Tab = (w_t*)malloc( sizeof(w_t)*nwars );
   alloc_pspaces(nwars, pspace);
 
@@ -566,7 +566,7 @@ sim( int nwar,
 	( (paddr) ? pspaces_[(warid)]->mem[(paddr)]\
 		  : pspaces_[(warid)]->lastresult )
 
-int _do_simulate(core_insn_t *core, long core_size, unsigned long *qptr, unsigned long queue_mask,
+int _do_simulate(core_insn_t *core, long core_size, unsigned *qptr, unsigned long queue_mask,
                  w_t *cur_warrior, unsigned long cycles, unsigned long proc_limit, unsigned *death_tab);
 
 
@@ -601,7 +601,7 @@ sim_proper( unsigned int nwar, const field_t *war_pos_tab,
    */
 
   core_insn_t *core;
-  unsigned long *queue_start, *queue_end; /* queue mem. start, end */
+  unsigned *queue_start, *queue_end; /* queue mem. start, end */
 
   /*
    * Cache Registers.
@@ -639,7 +639,7 @@ sim_proper( unsigned int nwar, const field_t *war_pos_tab,
 #define in_b rb_b
 
   unsigned *pofs;
-  unsigned long *pqofs;
+  unsigned *pqofs;
   core_insn_t *pt;
   unsigned int mode;
 
