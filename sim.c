@@ -206,8 +206,7 @@ sim_alloc_bufs( unsigned int nwars, unsigned int coresize,
  *    -2 -- warrior length > core size.
  */
 
-extern unsigned long _opcode_handler_table[18][7][8][8];
-
+extern signed int _opcode_handler_table[18][7][8][8];
 
 void
 sim_compile_warrior(core_insn_t *output, const insn_t *code, unsigned int len)
@@ -215,7 +214,8 @@ sim_compile_warrior(core_insn_t *output, const insn_t *code, unsigned int len)
   unsigned int i, mode_a, mode_b, modifier;
   u32_t in;
   char buffer[256];
-  unsigned long table_base, rc;
+  unsigned long table_base;
+  signed int rc;
 
   table_base = (unsigned long)_opcode_handler_table;
 

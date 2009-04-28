@@ -880,11 +880,11 @@ _do_clear_core:
 ; ***** OPCODE TABLE *****
 
 %macro gen_opcode_ref 0
-    dq (_cmd_ %+ OPCODE %+ _%{$MOD}_%{$AMODE}_%{$BMODE} - _opcode_handler_table)
+    dd (_cmd_ %+ OPCODE %+ _%{$MOD}_%{$AMODE}_%{$BMODE} - _opcode_handler_table)
 %endmacro
 
 %macro gen_opcode_stub 0
-    dq 0
+    dd 0
 %endmacro
 
     global _opcode_handler_table
