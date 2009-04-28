@@ -151,7 +151,7 @@ sim_alloc_bufs2( unsigned int nwars, unsigned int coresize,
   while (Queue_Size < queue_size)
     Queue_Size <<= 1;
 
-  Queue_Mem = (unsigned long*)malloc( sizeof(unsigned)*Queue_Size );
+  Queue_Mem = (unsigned long*)malloc( sizeof(unsigned)*(Queue_Size+1) );
   War_Tab = (w_t*)malloc( sizeof(w_t)*nwars );
   alloc_pspaces(nwars, pspace);
 
@@ -673,6 +673,8 @@ sim_proper( unsigned int nwar, const field_t *war_pos_tab,
   queue_end = Queue_Mem + NWarriors*Processes+1;
   pspaces_ = PSpaces;
   pspacesize = PSpace_size;
+
+  memset(Queue_Mem, 0, sizeof(unsigned)*(Queue_Size+1));
 
   /* Setup War_Tab and links all around */
   pqofs = queue_end-1;		/* init. wars[] table */

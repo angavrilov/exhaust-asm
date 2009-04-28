@@ -355,6 +355,8 @@ bool_get_mask:
   %endif
 
   %if mode_base(%1) == MODE_IMMEDIATE && mode_base(%2) == MODE_IMMEDIATE
+    prefetcht0    instr(rsi)
+
     %if flag_set(%3, NEED_OFS)
       mov    ARG_A_OFS, CUR_COFS
     %endif
@@ -371,6 +373,8 @@ bool_get_mask:
         flag_set(%4, NEED_OFS|NEED_VAL) || has_side_effects(%2)
       set_xmm_up_to CUR_COFS_XMM, CUR_COFS_32
 
+      prefetcht0    instr(rsi)
+
       movdqa       xmm1, CUR_CMD_XMM
       pslld        xmm1, 4
       xmm_add_wrap xmm1, CUR_COFS_XMM, CORE_SIZE_XMM
@@ -385,6 +389,8 @@ bool_get_mask:
  
       load_one_arg A,2,%1,%3
       load_one_arg B,3,%2,%4
+  %else
+    prefetcht0    instr(rsi)
   %endif
 %endmacro
 
@@ -392,6 +398,7 @@ bool_get_mask:
     lea rdx, warrior_head(NEXT_WARRIOR)
     mov rax, [rdx]
     mov NEXT_COFS_32, queue(rax)
+    mov esi,          queue(rax+1)    ; For prefetch
     step_queue rax
     mov NEXT_CMD, instr(NEXT_COFS)
     mov [rdx], rax
