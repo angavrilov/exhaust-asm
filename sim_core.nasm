@@ -218,8 +218,12 @@ BITS 64
 %endmacro    
 
 %macro get_dword 3
+  %ifdef SSE4
+    pextrd %1, %2, %3
+  %else
     pshufd xmm0, %2, shuffle(%3,%3,%3,%3)
     movd %1, xmm0
+  %endif
 %endmacro
 
 %macro use_mask 3
@@ -277,9 +281,13 @@ bool_get_mask:
     dd 0xFFFFFFFF
 
 %macro test_xmm_lb 1
+  %ifdef SSE4
+    ptest %1, %1
+  %else
     pshufb %1, [bool_get_mask]
     movd eax, %1
     test eax, eax
+  %endif
 %endmacro
 
 ; ***** GENERIC COMMANDS *****
@@ -601,11 +609,28 @@ gen_all_modes gen_spl_cmd
   %endif
 %endmacro
 
-%macro save_fields 3
+%macro make_save_mask 1
+  %ifndef SSE4
+    make_masks %1
+  %endif
+%endmacro
+
+%macro save_b_fields 3
+  %ifdef SSE4
+    %if (%$MOD == MOD_F) || (%$MOD == MOD_X) || (%$MOD == MOD_I)
+      pblendw %2, %3, 0x0F
+    %elif (%$MOD == MOD_A) || (%$MOD == MOD_BA)
+      pblendw %2, %3, 0xCF
+    %elif (%$MOD == MOD_B) || (%$MOD == MOD_AB)
+      pblendw %2, %3, 0x3F
+    %endif
+    movdqa instr(ARG_B_OFS), %2
+  %else
     pand %2, %1
     pandn %1, %3
     por %2, %1
     movdqa instr(ARG_B_OFS), %2
+  %endif
 %endmacro
 
 %macro gen_mov_cmd 0
@@ -622,9 +647,9 @@ gen_all_modes gen_spl_cmd
     jmp .done
   %else
     movdqa ARG_B_XMM, instr(ARG_B_OFS)
-    make_masks xmm1
+    make_save_mask xmm1
     make_shuffle ARG_A_XMM
-    save_fields xmm1, ARG_A_XMM, ARG_B_XMM
+    save_b_fields xmm1, ARG_A_XMM, ARG_B_XMM
     cmd_end_next
   %endif
 %endmacro
@@ -672,11 +697,11 @@ gen_all_modes gen_djn_cmd
 
 %macro gen_add_cmd 0
     begin_cmd OP_ADD, NEED_VAL, (NEED_OFS|NEED_VAL)
-    make_masks xmm1
+    make_save_mask xmm1
     make_shuffle ARG_A_XMM
     get_real_b_val xmm2
     xmm_add_wrap ARG_B_XMM, ARG_A_XMM, CORE_SIZE_1_XMM
-    save_fields xmm1, ARG_B_XMM, xmm2
+    save_b_fields xmm1, ARG_B_XMM, xmm2
     cmd_end_next
 %endmacro
 
@@ -705,11 +730,11 @@ gen_all_modes gen_jmz_cmd
 
 %macro gen_sub_cmd 0
     begin_cmd OP_SUB, NEED_VAL, (NEED_OFS|NEED_VAL)
-    make_masks xmm1
+    make_save_mask xmm1
     make_shuffle ARG_A_XMM
     get_real_b_val xmm2
     xmm_sub_wrap ARG_B_XMM, ARG_A_XMM, CORE_SIZE_1_XMM
-    save_fields xmm1, ARG_B_XMM, xmm2
+    save_b_fields xmm1, ARG_B_XMM, xmm2
     cmd_end_next
 %endmacro
 
@@ -786,7 +811,7 @@ gen_all_modes gen_jmn_cmd
 
 %macro gen_mul_cmd 0
     begin_cmd OP_MUL, NEED_VAL, (NEED_OFS|NEED_VAL)
-    make_masks xmm1
+    make_save_mask xmm1
     make_shuffle ARG_A_XMM
     get_real_b_val xmm2
 
@@ -812,12 +837,12 @@ gen_all_modes gen_jmn_cmd
   %endif
 
   %if (%$MOD == MOD_A) || (%$MOD == MOD_BA)
-    save_fields xmm1, xmm3, xmm2
+    save_b_fields xmm1, xmm3, xmm2
   %else
     %if (%$MOD != MOD_B) && (%$MOD != MOD_AB)
       por xmm4, xmm3
     %endif
-    save_fields xmm1, xmm4, xmm2
+    save_b_fields xmm1, xmm4, xmm2
   %endif
 
     cmd_end_next

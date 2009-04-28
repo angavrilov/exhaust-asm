@@ -10,6 +10,8 @@ OPT = -O4
 #OPT += -mcpu=i686 -march=i686
 DBG += -W -Wall -pedantic -ansi -g
 
+ASM += -DSSE4
+
 LD = 
 EXECUTABLES = exhaust
 
@@ -28,7 +30,7 @@ sim.o:	sim.c
 	${CC} ${CFLAGS} -c sim.c
 
 sim_core.o: sim_core.nasm
-	nasm -f elf64 -l sim_core.lst -o $@ $<
+	nasm -f elf64 -l sim_core.lst $(ASM) -o $@ $<
 
 clean:
 	rm -f *~ *.o core ${EXECUTABLES}
