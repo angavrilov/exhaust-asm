@@ -298,6 +298,13 @@ bool_get_mask:
 %define flag_set(v,f) (((v)&(f)) != 0)
 %define has_side_effects(v) ((mode_base(v) == MODE_PREDEC) || (mode_base(v) == MODE_POSTINC))
 
+%macro load_one_arg_addr 4
+  %if (mode_base(%3) != MODE_IMMEDIATE) && (has_side_effects(%3) || flag_set(%4, NEED_OFS|NEED_VAL))
+    xor             ARG_%1_OFS, ARG_%1_OFS
+    get_dword       ARG_%1_OFS_32, xmm1, %2
+  %endif
+%endmacro
+
 %macro load_one_arg 4
   %if mode_base(%3) == MODE_IMMEDIATE
     %if flag_set(%4, NEED_OFS)
@@ -307,9 +314,6 @@ bool_get_mask:
       movdqa ARG_%1_XMM, CUR_CMD_XMM
     %endif
   %elif has_side_effects(%3) || flag_set(%4, NEED_OFS|NEED_VAL)
-      xor             ARG_%1_OFS, ARG_%1_OFS
-      get_dword       ARG_%1_OFS_32, xmm1, %2
-
     %if mode_base(%3) != MODE_DIRECT
         lea             rdx, instr(ARG_%1_OFS)
         movdqa          xmm2, [rdx]
@@ -349,7 +353,6 @@ bool_get_mask:
 %macro load_args 4
   %if has_side_effects(%1) || has_side_effects(%2) || %3 != 0 || %4 != 0
     movdqa CUR_CMD_XMM, instr(CUR_COFS)
-    set_xmm_up_to CUR_COFS_XMM, CUR_COFS_32
   %endif
 
   %if mode_base(%1) == MODE_IMMEDIATE && mode_base(%2) == MODE_IMMEDIATE
@@ -367,9 +370,15 @@ bool_get_mask:
     %endif
   %elif flag_set(%3, NEED_OFS|NEED_VAL) || has_side_effects(%1) || \
         flag_set(%4, NEED_OFS|NEED_VAL) || has_side_effects(%2)
+      set_xmm_up_to CUR_COFS_XMM, CUR_COFS_32
+
       movdqa       xmm1, CUR_CMD_XMM
       pslld        xmm1, 4
       xmm_add_wrap xmm1, CUR_COFS_XMM, CORE_SIZE_XMM
+
+      load_one_arg_addr A,2,%1,%3
+      load_one_arg_addr B,3,%2,%4
+
     %if (flag_set(%3, NEED_OFS|NEED_VAL) && %1 >= MODE_INDIRECT && !mode_is_a(%1)) || \
         (flag_set(%4, NEED_OFS|NEED_VAL) && mode_is_a(%2))
         pshufhw         xmm4, xmm1, shuffle(2,3,0,1)
@@ -381,11 +390,12 @@ bool_get_mask:
 %endmacro
 
 %macro cmd_preamble 0
-    mov rax, warrior_head(NEXT_WARRIOR)
+    lea rdx, warrior_head(NEXT_WARRIOR)
+    mov rax, [rdx]
     mov NEXT_COFS, queue(rax)
     step_queue rax
     mov NEXT_CMD, instr(NEXT_COFS)
-    mov warrior_head(NEXT_WARRIOR), rax
+    mov [rdx], rax
 %endmacro
 
 %macro cmd_end 0
