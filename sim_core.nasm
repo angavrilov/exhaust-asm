@@ -132,7 +132,7 @@ BITS 64
 ;  xmm3  work                xmm11  ARG_A_XMM
 ;  xmm4                      xmm12  ARG_B_XMM
 ;  xmm5                      xmm13  CUR_COFS_XMM
-;  xmm6  MASK_AB_XMM         xmm14  CUR_CMD_XMM
+;  xmm6  MASK_AB_XMM         xmm14  CUR_CMD_XMM, CUR_B_XMM
 ;  xmm7  CORE_SIZE_1_XMM     xmm15  CORE_SIZE_XMM
 ;  
 
@@ -142,6 +142,8 @@ BITS 64
 %define ARG_A_OFS_32 esi
 %define ARG_B_OFS    rdi
 %define ARG_B_OFS_32 edi
+
+%define CUR_B_XMM    xmm14  ; Must be equal to CUR_CMD_XMM
 
 %define MASK_1_XMM xmm8
 %define MASK_A_XMM xmm9
@@ -295,7 +297,10 @@ bool_get_mask:
 
 %define NEED_OFS 1
 %define NEED_VAL 2
-%define NEED_ANY 3
+%define NEED_CUR 4
+%define NEED_ALL 7
+
+%define NEED_ANY 7
 
 %define flag_set(v,f)       (((v)&(f)) != 0)
 %define has_side_effects(v) ((mode_base(v) == MODE_PREDEC) || (mode_base(v) == MODE_POSTINC))
@@ -317,8 +322,11 @@ bool_get_mask:
       movdqa ARG_%1_XMM, CUR_CMD_XMM
     %endif
   %elif need_arg(%3,%4)
+    %if (mode_base(%3) != MODE_DIRECT) || flag_set(%4, NEED_VAL|NEED_CUR)
+      lea               rdx, instr(ARG_%1_OFS)
+    %endif
+
     %if mode_base(%3) != MODE_DIRECT
-        lea             rdx, instr(ARG_%1_OFS)
       %if mode_base(%3) != MODE_INDIRECT
         movdqa          xmm2, [rdx]
       %endif
@@ -350,9 +358,20 @@ bool_get_mask:
           xmm_inc_mask_wrap  xmm2, %3, CORE_SIZE_1_XMM
           movdqa             [rdx], xmm2
       %endif
+      %if flag_set(%4, NEED_CUR)
+        %if flag_set(%4, NEED_VAL) && (mode_base(%3) != MODE_POSTINC)
+          movdqa          CUR_%1_XMM, ARG_%1_XMM
+        %else
+          movdqa          CUR_%1_XMM, instr(ARG_%1_OFS)
+        %endif
+      %endif
     %elif flag_set(%4, NEED_VAL)
-        lea             rdx, instr(ARG_%1_OFS)
         movdqa          ARG_%1_XMM, [rdx]
+      %if flag_set(%4, NEED_CUR)
+        movdqa          CUR_%1_XMM, ARG_%1_XMM
+      %endif
+    %elif flag_set(%4, NEED_CUR)
+        movdqa          CUR_%1_XMM, [rdx]
     %endif
   %endif
 %endmacro
@@ -379,6 +398,11 @@ bool_get_mask:
 
     load_one_arg A,2,%1,%3
     load_one_arg B,3,%2,%4
+
+  %if flag_set(%4, NEED_CUR) && mode_base(%2) == MODE_IMMEDIATE && has_side_effects(%1)
+    ; CUR_CMD_XMM may be out of date, refetch
+    movdqa CUR_B_XMM, instr(CUR_COFS)
+  %endif
 %endmacro
 
 %macro cmd_preamble 0
@@ -617,28 +641,28 @@ gen_all_modes gen_spl_cmd
   %endif
 %endmacro
 
-%macro save_b_fields 3
+%macro save_b_fields 2
   %ifdef SSE4
     %if (%$MOD == MOD_F) || (%$MOD == MOD_X) || (%$MOD == MOD_I)
-      pblendw %2, %3, 0x0F
+      pblendw %2, CUR_B_XMM, 0x0F
     %elif (%$MOD == MOD_A) || (%$MOD == MOD_BA)
-      pblendw %2, %3, 0xCF
+      pblendw %2, CUR_B_XMM, 0xCF
     %elif (%$MOD == MOD_B) || (%$MOD == MOD_AB)
-      pblendw %2, %3, 0x3F
+      pblendw %2, CUR_B_XMM, 0x3F
     %endif
     movdqa instr(ARG_B_OFS), %2
   %else
     pand %2, %1
-    pandn %1, %3
+    pandn %1, CUR_B_XMM
     por %2, %1
     movdqa instr(ARG_B_OFS), %2
   %endif
 %endmacro
 
 %macro gen_mov_cmd 0
+  %if %$MOD == MOD_I
     begin_cmd OP_MOV, NEED_VAL, NEED_OFS
   
-  %if %$MOD == MOD_I
     movdqa instr(ARG_B_OFS), ARG_A_XMM
     cmp  ARG_B_OFS, NEXT_COFS
     je .fix
@@ -647,11 +671,12 @@ gen_all_modes gen_spl_cmd
  .fix:
     movq NEXT_CMD, ARG_A_XMM
     jmp .done
+
   %else
-    movdqa ARG_B_XMM, instr(ARG_B_OFS)
+    begin_cmd OP_MOV, NEED_VAL, (NEED_OFS|NEED_CUR)
     make_save_mask xmm1
     make_shuffle ARG_A_XMM
-    save_b_fields xmm1, ARG_A_XMM, ARG_B_XMM
+    save_b_fields xmm1, ARG_A_XMM
     cmd_end_next
   %endif
 %endmacro
@@ -660,30 +685,22 @@ gen_all_modes gen_mov_cmd
 
 ;  ---- DJN ----
 
-%macro get_real_b_val 1
-  %if mode_base(%$BMODE) == MODE_POSTINC
-    movdqa %1, instr(ARG_B_OFS)
-  %else
-    movdqa %1, ARG_B_XMM
-  %endif
-%endmacro
 
 %macro gen_djn_cmd 0
-    begin_cmd OP_DJN, NEED_OFS, (NEED_OFS|NEED_VAL)
+    begin_cmd OP_DJN, NEED_OFS, NEED_ALL
     
-    get_real_b_val xmm1
     pcmpeqd ARG_B_XMM, MASK_1_XMM ; true => now 0
     
   %if %$MOD == MOD_BA || %$MOD == MOD_A
-    xmm_dec_mask_wrap xmm1, MODE_AINDIRECT, CORE_SIZE_1_XMM
+    xmm_dec_mask_wrap CUR_B_XMM, MODE_AINDIRECT, CORE_SIZE_1_XMM
   %elif %$MOD == MOD_AB || %$MOD == MOD_B
-    xmm_dec_mask_wrap xmm1, MODE_INDIRECT, CORE_SIZE_1_XMM
+    xmm_dec_mask_wrap CUR_B_XMM, MODE_INDIRECT, CORE_SIZE_1_XMM
   %else
-    xmm_dec_mask_wrap xmm1, -1, CORE_SIZE_1_XMM
+    xmm_dec_mask_wrap CUR_B_XMM, -1, CORE_SIZE_1_XMM
   %endif
     
     make_masks ARG_B_XMM, pandn ; true => now nz in position
-    movdqa instr(ARG_B_OFS), xmm1
+    movdqa instr(ARG_B_OFS), CUR_B_XMM
     
     test_xmm_lb ARG_B_XMM
     jz %%nojump
@@ -698,12 +715,11 @@ gen_all_modes gen_djn_cmd
 ;  ---- ADD ----
 
 %macro gen_add_cmd 0
-    begin_cmd OP_ADD, NEED_VAL, (NEED_OFS|NEED_VAL)
+    begin_cmd OP_ADD, NEED_VAL, NEED_ALL
     make_save_mask xmm1
     make_shuffle ARG_A_XMM
-    get_real_b_val xmm2
     xmm_add_wrap ARG_B_XMM, ARG_A_XMM, CORE_SIZE_1_XMM
-    save_b_fields xmm1, ARG_B_XMM, xmm2
+    save_b_fields xmm1, ARG_B_XMM
     cmd_end_next
 %endmacro
 
@@ -712,7 +728,7 @@ gen_all_modes gen_add_cmd
 ;  ---- JMZ ----
 
 %macro gen_jmz_cmd 0
-    begin_cmd OP_JMZ, NEED_OFS, (NEED_OFS|NEED_VAL)
+    begin_cmd OP_JMZ, NEED_OFS, NEED_VAL
 
     pxor xmm0, xmm0
     pcmpeqd xmm0, ARG_B_XMM ; true => zero
@@ -731,12 +747,11 @@ gen_all_modes gen_jmz_cmd
 ;  ---- SUB ----
 
 %macro gen_sub_cmd 0
-    begin_cmd OP_SUB, NEED_VAL, (NEED_OFS|NEED_VAL)
+    begin_cmd OP_SUB, NEED_VAL, NEED_ALL
     make_save_mask xmm1
     make_shuffle ARG_A_XMM
-    get_real_b_val xmm2
     xmm_sub_wrap ARG_B_XMM, ARG_A_XMM, CORE_SIZE_1_XMM
-    save_b_fields xmm1, ARG_B_XMM, xmm2
+    save_b_fields xmm1, ARG_B_XMM
     cmd_end_next
 %endmacro
 
@@ -793,7 +808,7 @@ gen_all_modes gen_seq_cmd
 ;  ---- JMN ----
 
 %macro gen_jmn_cmd 0
-    begin_cmd OP_JMN, NEED_OFS, (NEED_OFS|NEED_VAL)
+    begin_cmd OP_JMN, NEED_OFS, NEED_VAL
 
     pxor xmm0, xmm0
     pcmpeqd xmm0, ARG_B_XMM ; true => zero
@@ -812,10 +827,9 @@ gen_all_modes gen_jmn_cmd
 ;  ---- MUL ----
 
 %macro gen_mul_cmd 0
-    begin_cmd OP_MUL, NEED_VAL, (NEED_OFS|NEED_VAL)
+    begin_cmd OP_MUL, NEED_VAL, NEED_ALL
     make_save_mask xmm1
     make_shuffle ARG_A_XMM
-    get_real_b_val xmm2
 
     mov rsi, CORE_SIZE  ; ARG_A_OFS unused
     shr rsi, 4
@@ -839,12 +853,12 @@ gen_all_modes gen_jmn_cmd
   %endif
 
   %if (%$MOD == MOD_A) || (%$MOD == MOD_BA)
-    save_b_fields xmm1, xmm3, xmm2
+    save_b_fields xmm1, xmm3
   %else
     %if (%$MOD != MOD_B) && (%$MOD != MOD_AB)
       por xmm4, xmm3
     %endif
-    save_b_fields xmm1, xmm4, xmm2
+    save_b_fields xmm1, xmm4
   %endif
 
     cmd_end_next
