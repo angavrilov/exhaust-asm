@@ -395,13 +395,12 @@ bool_get_mask:
 %endmacro
 
 %macro cmd_preamble 0
-    lea rdx, warrior_head(NEXT_WARRIOR)
-    mov rax, [rdx]
+    mov rax, warrior_head(NEXT_WARRIOR)
     mov NEXT_COFS_32, queue(rax)
     mov esi,          queue(rax+1)    ; For prefetch
     step_queue rax
     mov NEXT_CMD, instr(NEXT_COFS)
-    mov [rdx], rax
+    mov warrior_head(NEXT_WARRIOR), rax
 %endmacro
 
 %macro cmd_end 0
