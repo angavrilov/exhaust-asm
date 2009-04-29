@@ -316,24 +316,29 @@ bool_get_mask:
   %elif has_side_effects(%3) || flag_set(%4, NEED_OFS|NEED_VAL)
     %if mode_base(%3) != MODE_DIRECT
         lea             rdx, instr(ARG_%1_OFS)
+      %if mode_base(%3) != MODE_INDIRECT
         movdqa          xmm2, [rdx]
+      %endif
       %if mode_base(%3) == MODE_PREDEC
           xmm_dec_mask_wrap  xmm2, %3, CORE_SIZE_1_XMM
           movdqa             [rdx], xmm2
       %endif
       %if flag_set(%4, NEED_OFS|NEED_VAL)
-          movdqa          xmm3, xmm2
-          pslld           xmm3, 4
-        %if (mode_is_a(%3) && %2 == 3) || (!mode_is_a(%3) && %2 == 2)
-          xmm_add_wrap    xmm3, xmm4, CORE_SIZE_XMM
+        %if mode_base(%3) == MODE_PREDEC
+          %if mode_is_a(%3)
+            get_dword     eax, xmm2, 2
+          %else
+            get_dword     eax, xmm2, 3
+          %endif
         %else
-          xmm_add_wrap    xmm3, xmm1, CORE_SIZE_XMM
+          %if mode_is_a(%3)
+            mov           eax, [rdx+8]
+          %else
+            mov           eax, [rdx+12]
+          %endif
         %endif
-        %if mode_is_a(%3)
-            get_dword       ARG_%1_OFS_32, xmm3, 2
-        %else
-            get_dword       ARG_%1_OFS_32, xmm3, 3
-        %endif
+          shl             rax, 4
+          add_wrap        ARG_%1_OFS, rax, CORE_SIZE
         %if flag_set(%4, NEED_VAL)
           movdqa          ARG_%1_XMM, instr(ARG_%1_OFS)
         %endif
@@ -382,11 +387,6 @@ bool_get_mask:
       load_one_arg_addr A,2,%1,%3
       load_one_arg_addr B,3,%2,%4
 
-    %if (flag_set(%3, NEED_OFS|NEED_VAL) && %1 >= MODE_INDIRECT && !mode_is_a(%1)) || \
-        (flag_set(%4, NEED_OFS|NEED_VAL) && mode_is_a(%2))
-        pshufhw         xmm4, xmm1, shuffle(2,3,0,1)
-    %endif
- 
       load_one_arg A,2,%1,%3
       load_one_arg B,3,%2,%4
   %else
