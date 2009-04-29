@@ -295,12 +295,15 @@ bool_get_mask:
 
 %define NEED_OFS 1
 %define NEED_VAL 2
+%define NEED_ANY 3
 
-%define flag_set(v,f) (((v)&(f)) != 0)
+%define flag_set(v,f)       (((v)&(f)) != 0)
 %define has_side_effects(v) ((mode_base(v) == MODE_PREDEC) || (mode_base(v) == MODE_POSTINC))
+%define need_arg(v,m)       (has_side_effects(v) || flag_set(m, NEED_ANY))
+%define need_deref_arg(v,m) ((mode_base(v) != MODE_IMMEDIATE) && need_arg(v,m))
 
 %macro load_one_arg_addr 4
-  %if (mode_base(%3) != MODE_IMMEDIATE) && (has_side_effects(%3) || flag_set(%4, NEED_OFS|NEED_VAL))
+  %if need_deref_arg(%3, %4)
     get_dword       ARG_%1_OFS_32, xmm1, %2
   %endif
 %endmacro
@@ -313,7 +316,7 @@ bool_get_mask:
     %if flag_set(%4, NEED_VAL)
       movdqa ARG_%1_XMM, CUR_CMD_XMM
     %endif
-  %elif has_side_effects(%3) || flag_set(%4, NEED_OFS|NEED_VAL)
+  %elif need_arg(%3,%4)
     %if mode_base(%3) != MODE_DIRECT
         lea             rdx, instr(ARG_%1_OFS)
       %if mode_base(%3) != MODE_INDIRECT
@@ -323,7 +326,7 @@ bool_get_mask:
           xmm_dec_mask_wrap  xmm2, %3, CORE_SIZE_1_XMM
           movdqa             [rdx], xmm2
       %endif
-      %if flag_set(%4, NEED_OFS|NEED_VAL)
+      %if flag_set(%4, NEED_ANY)
         %if mode_base(%3) == MODE_PREDEC
           %if mode_is_a(%3)
             get_dword     eax, xmm2, 2
@@ -355,27 +358,11 @@ bool_get_mask:
 %endmacro
 
 %macro load_args 4
-  %if has_side_effects(%1) || has_side_effects(%2) || %3 != 0 || %4 != 0
+  %if need_arg(%1,%3) || need_arg(%2,%4)
     movdqa CUR_CMD_XMM, instr(CUR_COFS)
   %endif
 
-  %if mode_base(%1) == MODE_IMMEDIATE && mode_base(%2) == MODE_IMMEDIATE
-    prefetcht0    instr(rsi)
-
-    %if flag_set(%3, NEED_OFS)
-      mov    ARG_A_OFS, CUR_COFS
-    %endif
-    %if flag_set(%3, NEED_VAL)
-      movdqa ARG_A_XMM, CUR_CMD_XMM
-    %endif
-    %if flag_set(%4, NEED_OFS)
-      mov    ARG_B_OFS, CUR_COFS
-    %endif
-    %if flag_set(%4, NEED_VAL)
-      movdqa ARG_B_XMM, CUR_CMD_XMM
-    %endif
-  %elif flag_set(%3, NEED_OFS|NEED_VAL) || has_side_effects(%1) || \
-        flag_set(%4, NEED_OFS|NEED_VAL) || has_side_effects(%2)
+  %if need_deref_arg(%1,%3) || need_deref_arg(%2,%4)
       set_xmm_up_to CUR_COFS_XMM, CUR_COFS_32
 
       prefetcht0    instr(rsi)
@@ -386,12 +373,12 @@ bool_get_mask:
 
       load_one_arg_addr A,2,%1,%3
       load_one_arg_addr B,3,%2,%4
-
-      load_one_arg A,2,%1,%3
-      load_one_arg B,3,%2,%4
   %else
-    prefetcht0    instr(rsi)
+      prefetcht0    instr(rsi)
   %endif
+
+    load_one_arg A,2,%1,%3
+    load_one_arg B,3,%2,%4
 %endmacro
 
 %macro cmd_preamble 0
