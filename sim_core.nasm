@@ -229,6 +229,26 @@ BITS 64
   %endif
 %endmacro
 
+%macro set_dword 3
+    movd %1, %2
+  %if %3 == 1
+    pshufd %1, %1, shuffle(1,0,1,1)
+  %elif %3 == 2
+    pshufd %1, %1, shuffle(1,1,0,1)
+  %elif %3 == 3
+    pshufd %1, %1, shuffle(1,1,1,0)
+  %endif
+%endmacro
+
+%macro ins_dword_0 3
+  %ifdef SSE4
+    pinsrd %1, %2, %3
+  %else
+    set_dword xmm0, %2, %3
+    por %1, xmm0
+  %endif
+%endmacro
+
 %macro use_mask 3
   %if %3 < 0
     %1 %2, MASK_AB_XMM
@@ -839,8 +859,7 @@ gen_all_modes gen_jmn_cmd
     get_dword edx, ARG_B_XMM, 2
     mul edx
     div rsi
-    movd xmm3, edx
-    pshufd xmm3, xmm3, shuffle(1,1,0,1)
+    set_dword xmm3, edx, 2
   %endif
 
   %if (%$MOD != MOD_A) && (%$MOD != MOD_BA)
@@ -848,18 +867,14 @@ gen_all_modes gen_jmn_cmd
     get_dword edx, ARG_B_XMM, 3
     mul edx
     div rsi
-    movd xmm4, edx
-    pshufd xmm4, xmm4, shuffle(1,1,1,0)
+    %if (%$MOD != MOD_B) && (%$MOD != MOD_AB)
+      ins_dword_0 xmm3, edx, 3
+    %else
+      set_dword xmm3, edx, 3
+    %endif
   %endif
 
-  %if (%$MOD == MOD_A) || (%$MOD == MOD_BA)
     save_b_fields xmm1, xmm3
-  %else
-    %if (%$MOD != MOD_B) && (%$MOD != MOD_AB)
-      por xmm4, xmm3
-    %endif
-    save_b_fields xmm1, xmm4
-  %endif
 
     cmd_end_next
 %endmacro
