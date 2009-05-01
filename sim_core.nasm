@@ -582,10 +582,11 @@ gen_all_modes gen_jmp_cmd
 
 %macro gen_dat_cmd 0
     begin_cmd OP_DAT, 0, 0
-    jmp dat_cmd_common
+    jmp process_dies
 %endmacro
 
-dat_cmd_common:
+    ; CUR_COFS may be invalid
+process_dies:
     ; Decrement the process counter
     sub warrior_live(CUR_WARRIOR), dword 1
     jz .continue
@@ -899,6 +900,79 @@ gen_all_modes gen_mul_cmd
 
 gen_all_modes gen_slt_cmd
 
+;  ---- DIV, MODM ----
+
+%macro gen_div_mod_block 3
+    get_dword esi, ARG_A_XMM, %1
+    get_dword eax, ARG_B_XMM, %1
+
+    test esi, esi
+    jz %%fail
+
+    xor edx, edx
+    div esi
+  %if %$xmm3_used
+    ins_dword_0 xmm3, %2, %1
+  %else
+    set_dword   xmm3, %2, %1
+  %endif
+    jmp short %%done
+
+ %%fail:
+    ; one instruction occupies 16 bytes, so the offset cannot be 1
+    mov CUR_COFS, 1
+
+  %if %$xmm3_used
+    movdqa xmm0, CUR_B_XMM
+    pand   xmm0, %3
+    por    xmm3, xmm0
+  %else
+    movdqa xmm3, CUR_B_XMM
+    pand   xmm3, %3
+  %endif
+
+ %%done:
+%endmacro
+
+%macro gen_div_mod_cmd 0
+    begin_cmd OPCODE, NEED_VAL, NEED_ALL
+    make_save_mask xmm1
+    make_shuffle ARG_A_XMM
+
+    %assign %$xmm3_used 0
+
+  %if (%$MOD != MOD_B) && (%$MOD != MOD_AB)
+    %if OPCODE == OP_DIV
+      gen_div_mod_block 2, eax, MASK_A_XMM
+    %else
+      gen_div_mod_block 2, edx, MASK_A_XMM
+    %endif
+
+    %assign %$xmm3_used 1
+  %endif
+
+  %if (%$MOD != MOD_A) && (%$MOD != MOD_BA)
+    %if OPCODE == OP_DIV
+      gen_div_mod_block 3, eax, MASK_B_XMM
+    %else
+      gen_div_mod_block 3, edx, MASK_B_XMM
+    %endif
+  %endif
+
+    save_b_fields xmm1, xmm3
+
+    ; Check for the failure flag
+    cmp CUR_COFS, 1
+    je  process_dies
+
+    cmd_end_next
+%endmacro
+
+%assign OPCODE OP_DIV
+gen_all_modes gen_div_mod_cmd
+%assign OPCODE OP_MODM
+gen_all_modes gen_div_mod_cmd
+
 ; ***** CORE CLEAR *****
 
     global _do_clear_core
@@ -967,9 +1041,9 @@ _opcode_handler_table:
     %assign OPCODE OP_MUL
     gen_all_modes gen_opcode_ref
     %assign OPCODE OP_MODM
-    gen_all_modes gen_opcode_stub
+    gen_all_modes gen_opcode_ref
     %assign OPCODE OP_DIV
-    gen_all_modes gen_opcode_stub
+    gen_all_modes gen_opcode_ref
     %assign OPCODE OP_LTP
     gen_all_modes gen_opcode_stub
     %assign OPCODE OP_STP
