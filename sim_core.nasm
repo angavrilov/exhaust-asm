@@ -536,9 +536,23 @@ _do_simulate:
     jne .loop
     mov ALIVE_CNT, rax
     
-    ; Initialize the scheduler registers
+    ; Initialize the warrior walker
     mov NEXT_WARRIOR, warrior_next(CUR_WARRIOR)
     
+    ; If there is only one warrior, we need to schedule
+    ; the thread stub; otherwise the scheduler would
+    ; malfunction.
+    cmp NEXT_WARRIOR, CUR_WARRIOR
+    jne .no_stub_needed
+
+    mov       rax, single_thread_stub
+    movq      xmm0, rax
+    ; Put the stub right behind the end of the core:
+    movdqa    [CORE_BASE+CORE_SIZE], xmm0
+    queue_cmd CORE_SIZE_32
+ .no_stub_needed:
+
+    ; Initialize the scheduler registers
     mov rax, warrior_head(CUR_WARRIOR)
     mov CUR_COFS_32, queue(rax)
     step_queue rax
@@ -547,6 +561,33 @@ _do_simulate:
     ; Start the interpreter
     mov NEXT_CMD, instr(CUR_COFS)
     jmp NEXT_CMD
+
+; --------
+
+    align 16
+single_thread_stub:
+    ; The scheduler scheme assumes that there are at least two threads
+    ; running, which is always correct in the multiple warrior case.
+    ; If there is only one warrior, the system inserts this stub to
+    ; ensure correctness.
+    ;
+    ; Has cmd_preamble and cmd_end inlined and simplified.
+    ;
+    mov rax, warrior_head(CUR_WARRIOR)
+    mov NEXT_COFS_32, queue(rax)
+    step_queue rax
+    mov NEXT_CMD, instr(NEXT_COFS)
+    mov warrior_head(CUR_WARRIOR), rax
+
+    cmp warrior_live(CUR_WARRIOR), dword 1
+    ja .multiple_threads                   ; Suicide if many threads
+    queue_cmd CUR_COFS_32
+ .multiple_threads:
+
+    mov CUR_COFS,NEXT_COFS
+    jmp NEXT_CMD
+
+; --------
 
     align 16
 timeout_reached:
@@ -591,9 +632,20 @@ gen_all_modes gen_jmp_cmd
 process_dies:
     ; Decrement the process counter
     sub warrior_live(CUR_WARRIOR), dword 1
-    jz .continue
+    jz .warrior_died
+    cmp CUR_WARRIOR, NEXT_WARRIOR
+    je .one_warrior
     cmd_end
- .continue:
+
+ .one_warrior:
+    cmp warrior_live(CUR_WARRIOR), dword 1
+    ja .no_stub
+    ; If back down to one thread, schedule the stub
+    queue_cmd CORE_SIZE_32
+ .no_stub:
+    cmd_end
+
+ .warrior_died:
     ; Destroy the dead warrior
     mov rdx, warrior_prev(CUR_WARRIOR)
     mov warrior_next(rdx), NEXT_WARRIOR
