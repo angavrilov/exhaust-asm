@@ -490,6 +490,8 @@ _cmd_%1_%{$MOD}_%{$AMODE}_%{$BMODE}:
 %define ALIVE_CNT  [rbp-8*5-8]
 %define PROC_LIMIT [rbp+16+8*0]
 %define DEATH_TAB  [rbp+16+8*1]
+%define PSPACE_TAB [rbp+16+8*2]
+%define PSPACE_SIZE [rbp+16+8*3]
 
     global _do_simulate
 _do_simulate:
@@ -973,6 +975,85 @@ gen_all_modes gen_div_mod_cmd
 %assign OPCODE OP_MODM
 gen_all_modes gen_div_mod_cmd
 
+;  ---- LDP ----
+
+%macro compute_pspace_offset 2
+    get_dword eax, %1, %2
+
+    xor    rdx, rdx
+    div    qword PSPACE_SIZE
+    mov    rsi, PSPACE_TAB
+    mov    rax, warrior_id(CUR_WARRIOR)
+    mov    rsi, [rsi + rax*8]
+    test   rdx, rdx
+    cmovnz rsi, [rsi + 8]      ; pspace->mem vs &pspace->lastresult
+    lea    rsi, [rsi + rdx*4]
+%endmacro
+
+%macro gen_ltp_cmd 0
+    begin_cmd OP_LTP, NEED_VAL, NEED_ALL
+
+  %if (%$MOD == MOD_A) || (%$MOD == MOD_AB)
+    compute_pspace_offset ARG_A_XMM, 2
+  %else
+    compute_pspace_offset ARG_A_XMM, 3
+  %endif
+
+    mov  eax, [rsi]    ; Fetch the pspace value
+
+  %if (%$MOD == MOD_A) || (%$MOD == MOD_BA)
+    set_dword xmm3, eax, 2
+  %else
+    set_dword xmm3, eax, 3
+  %endif
+    
+  %ifdef SSE4
+    %if (%$MOD == MOD_A) || (%$MOD == MOD_BA)
+      pblendw xmm3, CUR_B_XMM, 0xCF
+    %else
+      pblendw xmm3, CUR_B_XMM, 0x3F
+    %endif
+
+    movdqa instr(ARG_B_OFS), xmm3
+  %else
+    %if (%$MOD == MOD_A) || (%$MOD == MOD_BA)
+      movdqa xmm1, MASK_A_XMM
+    %else
+      movdqa xmm1, MASK_B_XMM
+    %endif
+
+    save_b_fields xmm1, xmm3
+  %endif
+
+    cmd_end_next
+%endmacro
+
+gen_all_modes gen_ltp_cmd
+
+;  ---- STP ----
+
+%macro gen_stp_cmd 0
+    begin_cmd OP_STP, NEED_VAL, NEED_VAL
+
+  %if (%$MOD == MOD_A) || (%$MOD == MOD_BA)
+    compute_pspace_offset ARG_B_XMM, 2
+  %else
+    compute_pspace_offset ARG_B_XMM, 3
+  %endif
+
+  %if (%$MOD == MOD_A) || (%$MOD == MOD_AB)
+    get_dword eax, ARG_A_XMM, 2
+  %else
+    get_dword eax, ARG_A_XMM, 3
+  %endif
+ 
+    mov [rsi], eax    ; Store the data
+
+    cmd_end_next
+%endmacro
+
+gen_all_modes gen_stp_cmd
+
 ; ***** CORE CLEAR *****
 
     global _do_clear_core
@@ -1045,7 +1126,7 @@ _opcode_handler_table:
     %assign OPCODE OP_DIV
     gen_all_modes gen_opcode_ref
     %assign OPCODE OP_LTP
-    gen_all_modes gen_opcode_stub
+    gen_all_modes gen_opcode_ref
     %assign OPCODE OP_STP
-    gen_all_modes gen_opcode_stub
+    gen_all_modes gen_opcode_ref
 

@@ -567,7 +567,8 @@ sim( int nwar,
 		  : pspaces_[(warid)]->lastresult )
 
 int _do_simulate(core_insn_t *core, long core_size, unsigned *qptr, unsigned long queue_mask,
-                 w_t *cur_warrior, unsigned long cycles, unsigned long proc_limit, unsigned *death_tab);
+                 w_t *cur_warrior, unsigned long cycles, unsigned long proc_limit,
+                 unsigned *death_tab, pspace_t **pspaces, unsigned long pspace_size);
 
 
 int
@@ -701,7 +702,8 @@ sim_proper( unsigned int nwar, const field_t *war_pos_tab,
    */
   w = &War_Tab[ nwar-1 ];
 
-  return _do_simulate(core, coresize*sizeof(core_insn_t), queue_start, Queue_Size-1, w, cycles, Processes, death_tab);
+  return _do_simulate(core, coresize*sizeof(core_insn_t), queue_start, Queue_Size-1, 
+                      w, cycles, Processes, death_tab, pspaces_, pspacesize);
 
 #if 0
   do {
