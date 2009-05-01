@@ -866,6 +866,24 @@ gen_all_modes gen_jmn_cmd
 
 gen_all_modes gen_mul_cmd
 
+;  ---- SLT ----
+
+%macro gen_slt_cmd 0
+    begin_cmd OP_SLT, NEED_VAL, NEED_VAL
+
+    make_shuffle ARG_A_XMM
+    pcmpgtd ARG_B_XMM, ARG_A_XMM  ; true => a < b
+    make_masks ARG_B_XMM, pandn   ; true => !(a < b) in position
+
+    test_xmm_lb ARG_B_XMM
+    jz %%skip
+    cmd_end_next
+  %%skip:
+    cmd_end_next 2
+%endmacro
+
+gen_all_modes gen_slt_cmd
+
 ; ***** CORE CLEAR *****
 
     global _do_clear_core
@@ -924,7 +942,7 @@ _opcode_handler_table:
     %assign OPCODE OP_SNE
     gen_all_modes gen_opcode_ref
     %assign OPCODE OP_SLT
-    gen_all_modes gen_opcode_stub
+    gen_all_modes gen_opcode_ref
     %assign OPCODE OP_JMN
     gen_all_modes gen_opcode_ref
     %assign OPCODE OP_JMP
