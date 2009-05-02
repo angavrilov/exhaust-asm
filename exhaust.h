@@ -56,15 +56,8 @@ typedef int            s32_t;
     u16_t in;                   /* flags, opcode, modifier, a- and b-modes */
     field_t a, b;               /* a-value, b-value */
   } insn_t;
-
   
-  /*
-   * Instructions in core
-   */
-  typedef struct core_insn_st {
-    unsigned long in;            /* opaque identifier (handler address) */
-    unsigned a, b;               /* a-value, b-value */
-  } core_insn_t;
+#include "sim_core.h"
 
   /*
    * Warrior struct

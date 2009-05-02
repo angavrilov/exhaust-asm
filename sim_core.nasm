@@ -466,7 +466,7 @@ _cmd_%1_%{$MOD}_%{$AMODE}_%{$BMODE}:
     load_args %$AMODE, %$BMODE, %2, %3
 %endmacro
 
-; CORE
+; ***** INTERPRETER CORE *****
 
 ;
 ;  rax  tmp                  r8   CUR_WARRIOR
@@ -484,7 +484,7 @@ _cmd_%1_%{$MOD}_%{$AMODE}_%{$BMODE}:
 ;  xmm3  work                xmm11  ARG_A_XMM
 ;  xmm4                      xmm12  ARG_B_XMM
 ;  xmm5                      xmm13  CUR_COFS_XMM
-;  xmm6                      xmm14  CUR_CMD_XMM
+;  xmm6  MASK_AB_XMM         xmm14  CUR_CMD_XMM, CUR_B_XMM
 ;  xmm7  CORE_SIZE_1_XMM     xmm15  CORE_SIZE_XMM
 
 %define ALIVE_CNT  [rbp-8*5-8]
@@ -493,8 +493,8 @@ _cmd_%1_%{$MOD}_%{$AMODE}_%{$BMODE}:
 %define PSPACE_TAB [rbp+16+8*2]
 %define PSPACE_SIZE [rbp+16+8*3]
 
-    global _do_simulate
-_do_simulate:
+    global sim_core_run
+sim_core_run:
     push rbp
     mov  rbp, rsp
     push r12
@@ -521,10 +521,11 @@ _do_simulate:
     pshufd MASK_AB_XMM, xmm0, shuffle(1,1,0,0)
     mov eax, 1
     set_xmm_up_to MASK_1_XMM, eax
-    mov eax, CORE_SIZE_32
-    set_xmm_up_to CORE_SIZE_XMM, eax
-    shr eax, 4
-    set_xmm_up_to CORE_SIZE_1_XMM, eax
+
+    ; Adjust the core size
+    set_xmm_up_to CORE_SIZE_1_XMM, CORE_SIZE_32
+    shl CORE_SIZE, 4
+    set_xmm_up_to CORE_SIZE_XMM, CORE_SIZE_32
 
     ; Count live warriors
     mov rdx, CUR_WARRIOR
@@ -1108,8 +1109,8 @@ gen_all_modes gen_stp_cmd
 
 ; ***** CORE CLEAR *****
 
-    global _do_clear_core
-_do_clear_core:
+    global sim_core_clear
+sim_core_clear:
     mov  rax, _cmd_0_0_0_0
     movq xmm0, rax
     mov  ecx, esi
@@ -1136,15 +1137,15 @@ _do_clear_core:
 ; ***** OPCODE TABLE *****
 
 %macro gen_opcode_ref 0
-    dd (_cmd_ %+ OPCODE %+ _%{$MOD}_%{$AMODE}_%{$BMODE} - _opcode_handler_table)
+    dd (_cmd_ %+ OPCODE %+ _%{$MOD}_%{$AMODE}_%{$BMODE} - sim_core_opcode_handlers)
 %endmacro
 
 %macro gen_opcode_stub 0
     dd 0
 %endmacro
 
-    global _opcode_handler_table
-_opcode_handler_table:
+    global sim_core_opcode_handlers
+sim_core_opcode_handlers:
     %assign OPCODE OP_DAT
     gen_all_modes gen_opcode_ref
     %assign OPCODE OP_SPL
